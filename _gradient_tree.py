@@ -110,7 +110,7 @@ class GradientNode:
         # Terminal Condition
         if (self.depth >= self.max_depth or 
             len(self.data) <= self.min_samples_leaf or
-            len(self.data) <= 0
+            len(self.data.drop_duplicates()) <= 1
             ):
 
             self.label = '({}), n_leaf: {}'.format(
