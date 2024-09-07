@@ -4,4 +4,6 @@
 **/._.DS_Store
 
 __pycache__
-test.py
+dgp_test.py
+/test
+/result

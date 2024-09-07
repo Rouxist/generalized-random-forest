@@ -24,7 +24,7 @@ if __name__ == "__main__":
         print(f"Estimate = {estimate}")
 
     elif MODEL == "GRF": # Generalized Random Forest
-        grf = GRF(target="price", n_estimators=1, data_weight_ratio=0.7)
+        grf = GRF(target="price", n_estimators=100, min_samples_leaf=5, honest=True, data_weight_ratio=0.5, random_state=42)
         grf.fit(df_train)
         # grf.visualize(file_name='trees_visualized.txt')
         estimate = grf.predict(datapoint)

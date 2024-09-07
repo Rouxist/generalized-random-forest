@@ -208,13 +208,15 @@ class GradientNode:
         return lines, n + m + u, max(p, q) + 2, n + u // 2
 
 class GradientTree:
-    def __init__(self, idx:int=0) -> None:
+    def __init__(self, idx:int=0, min_samples_leaf:int=3, max_depth:int=5) -> None:
         self.root = None            # root node of the tree
         self.searching_node = None  # node being searched in prediction step
         self.idx = idx              # ID of the tree in the GRF
+        self.min_samples_leaf = min_samples_leaf
+        self.max_depth = max_depth
     
     def fit(self, bootstrapped_data:pd.DataFrame, target:str) -> None:
-        self.root = GradientNode(data_bootstrapped=bootstrapped_data, target=target, min_samples_leaf=3, depth=1, max_depth=5)
+        self.root = GradientNode(data_bootstrapped=bootstrapped_data, target=target, min_samples_leaf=self.min_samples_leaf, depth=1, max_depth=self.max_depth)
         self.root.split()
     
     def predict(self, x:pd.Series) -> float | bool:
