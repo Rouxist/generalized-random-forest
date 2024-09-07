@@ -84,21 +84,35 @@ class GRF:
             # Depends on Regression equation
             return np.sum(self.alpha[dp_idx].dot(y-theta))
 
-        # simply iterates datapoint with time complexity O(n)
-        for dp_idx, (_, dp) in enumerate(x.iterrows()):
+        if n_samples == 1:
             for tree in self.tree_list:
-                estimate_given_dp = tree.predict(dp)
+                estimate_given_dp = tree.predict(x)
                 multi = tree.predict(self.data_weight)
                 neighbors = [idx for (idx, weight_data_estim) in enumerate(multi) if estimate_given_dp==weight_data_estim]
 
             # Update weights
             for neighbor in neighbors:
-                self.alpha[dp_idx][neighbor] += 1 / len(neighbors) / self.n_estimators
+                self.alpha[0][neighbor] += 1 / len(neighbors) / self.n_estimators
 
             theta_0 = np.mean(self.data_weight[self.target])
-            res = fsolve(sum_moment_condition, theta_0, dp_idx)
-            predictions.append(res[0])
-        return predictions
+            res = fsolve(sum_moment_condition, theta_0, 0)
+            return res[0]
+        else:
+            # simply iterates datapoint with time complexity O(n)
+            for dp_idx, (_, dp) in enumerate(x.iterrows()):
+                for tree in self.tree_list:
+                    estimate_given_dp = tree.predict(dp)
+                    multi = tree.predict(self.data_weight)
+                    neighbors = [idx for (idx, weight_data_estim) in enumerate(multi) if estimate_given_dp==weight_data_estim]
+
+                # Update weights
+                for neighbor in neighbors:
+                    self.alpha[dp_idx][neighbor] += 1 / len(neighbors) / self.n_estimators
+
+                theta_0 = np.mean(self.data_weight[self.target])
+                res = fsolve(sum_moment_condition, theta_0, dp_idx)
+                predictions.append(res[0])
+            return predictions
 
     def visualize(self, file_name:str) -> None:
         if len(self.tree_list) != 0:
