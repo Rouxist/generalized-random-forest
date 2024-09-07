@@ -32,7 +32,7 @@ class GradientNode:
         self.split_feature = ''
         self.split_point = 0
         self.label = ''
-        self.estimate = round(self.get_theta_p_hat(), 2)
+        self.estimate = self.get_theta_p_hat()
 
     def get_theta_p_hat(self) -> float:
         
@@ -220,25 +220,57 @@ class GradientTree:
         self.root.split()
 
         return self
-    
-    def predict(self, x:pd.Series) -> float | bool:
-        self.searching_node = self.root
+
+    def predict(self, X: pd.DataFrame|pd.Series) -> list[float | bool]:
+        if X.ndim == 1:
+            self.searching_node = self.root
         
-        while self.searching_node:
-            if not self.searching_node.left and not self.searching_node.right:
-                return self.searching_node.estimate
+            while self.searching_node:
+                if not self.searching_node.left and not self.searching_node.right:
+                    return self.searching_node.estimate
+                
+                elif X[self.searching_node.split_feature] <= self.searching_node.split_point:
+                    if self.searching_node.left is not None:
+                        self.searching_node = self.searching_node.left
+                    else:
+                        return False
+                
+                elif X[self.searching_node.split_feature] > self.searching_node.split_point:
+                    if self.searching_node.right is not None:
+                        self.searching_node = self.searching_node.right
+                    else:
+                        return False
+
+        else:
+            feature_idx = {col:idx for idx, col in enumerate(X.columns)}
+            X = X.to_numpy()  # Convert DataFrame to numpy array
+            num_samples = X.shape[0]
+            predictions = np.empty(num_samples, dtype=object)
+
+            for i in range(num_samples):
+                x = X[i]
+                self.searching_node = self.root
+                
+                while self.searching_node:
+                    if not self.searching_node.left and not self.searching_node.right:
+                        predictions[i] = self.searching_node.estimate
+                        break
+                   
+                    if x[feature_idx[self.searching_node.split_feature]] <= self.searching_node.split_point:
+                        if self.searching_node.left is not None:
+                            self.searching_node = self.searching_node.left
+                        else:
+                            predictions[i] = False
+                            break
+                    
+                    else:
+                        if self.searching_node.right is not None:
+                            self.searching_node = self.searching_node.right
+                        else:
+                            predictions[i] = False
+                            break
             
-            elif x[self.searching_node.split_feature] <= self.searching_node.split_point:
-                if self.searching_node.left is not None:
-                    self.searching_node = self.searching_node.left
-                else:
-                    return False
-            
-            elif x[self.searching_node.split_feature] > self.searching_node.split_point:
-                if self.searching_node.right is not None:
-                    self.searching_node = self.searching_node.right
-                else:
-                    return False
+            return predictions
 
     def visualize(self, file_name:str) -> None:
         self.root.visualize(file_name, self.idx)

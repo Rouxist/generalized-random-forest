@@ -72,32 +72,33 @@ class GRF:
 
         self.tree_list.extend(trees_fitted)
     
-    def predict(self, x:pd.Series) -> float:
-        # Initialize weights of each data point in data_weight
-        self.alpha = np.zeros(len(self.data_weight))
-
-        # Calculates weights of each data point in data_weight
-        for tree in self.tree_list:
-            neighbors = []
-            estimate_given_datapoint = tree.predict(x)
-            for index, (idx, data_point) in enumerate(self.data_weight.iterrows()):
-                estimate_weight_data = tree.predict(data_point)
-                if estimate_weight_data == estimate_given_datapoint: # if the datapoint is in same leaf with the given datapoint
-                    neighbors.append(index) # alt: neighbors.append(data_point.name)
-
-            # Update weights
-            for neighbor in neighbors:
-                self.alpha[neighbor] += 1 / len(neighbors) / self.n_estimators
-
-        def sum_moment_condition(theta) -> float: # Eq (2)
+    def predict(self, x:pd.DataFrame|pd.Series) -> float:
+        ### new predict func
+        n_samples = 1 if x.ndim == 1 else x.shape[0]
+        self.alpha = [np.zeros(len(self.data_weight)) for _ in range(n_samples)]
+        predictions = []
+        
+        def sum_moment_condition(theta, dp_idx) -> float: # Eq (2)
             y = self.data_weight[self.target]
 
             # Depends on Regression equation
-            return np.sum(self.alpha.dot(y-theta))
+            return np.sum(self.alpha[dp_idx].dot(y-theta))
 
-        theta_0 = np.mean(self.data_weight[self.target])
-        res = fsolve(sum_moment_condition, theta_0)
-        return round(res[0], 2)
+        # simply iterates datapoint with time complexity O(n)
+        for dp_idx, (_, dp) in enumerate(x.iterrows()):
+            for tree in self.tree_list:
+                estimate_given_dp = tree.predict(dp)
+                multi = tree.predict(self.data_weight)
+                neighbors = [idx for (idx, weight_data_estim) in enumerate(multi) if estimate_given_dp==weight_data_estim]
+
+            # Update weights
+            for neighbor in neighbors:
+                self.alpha[dp_idx][neighbor] += 1 / len(neighbors) / self.n_estimators
+
+            theta_0 = np.mean(self.data_weight[self.target])
+            res = fsolve(sum_moment_condition, theta_0, dp_idx)
+            predictions.append(res[0])
+        return predictions
 
     def visualize(self, file_name:str) -> None:
         if len(self.tree_list) != 0:
