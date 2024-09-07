@@ -158,7 +158,7 @@ class GradientNode:
     def visualize(self, file_name:str, tree_idx:int) -> None:
         lines, _, _, _ = self._visualize_aux()
 
-        with open(file_name, 'a') as file:
+        with open("result/" + file_name, 'a') as file:
             file.writelines(f"Tree {tree_idx}\n")
             file.writelines(line + '\n' for line in lines)
             file.writelines("\n\n")
