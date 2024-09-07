@@ -99,15 +99,17 @@ class GRF:
             return res[0]
         else:
             # simply iterates datapoint with time complexity O(n)
-            for dp_idx, (_, dp) in enumerate(x.iterrows()):
-                for tree in self.tree_list:
-                    estimate_given_dp = tree.predict(dp)
-                    multi = tree.predict(self.data_weight)
-                    neighbors = [idx for (idx, weight_data_estim) in enumerate(multi) if estimate_given_dp==weight_data_estim]
-
-                # Update weights
-                for neighbor in neighbors:
-                    self.alpha[dp_idx][neighbor] += 1 / len(neighbors) / self.n_estimators
+            estimate_given_dps = [tree.predict(x) for tree in self.tree_list] # length of n_estimator and each element has length of given datapoints
+            for dp_idx in range(len(x)):
+                for tree_idx in range(self.n_estimators):
+                    # Find neighbors
+                    multi = self.tree_list[tree_idx].predict(self.data_weight)
+                    neighbors = [idx for (idx, weight_data_estim) in enumerate(multi) if estimate_given_dps[tree_idx][dp_idx]==weight_data_estim]
+                    
+                    # Update weights
+                    if len(neighbors) > 0:
+                        for neighbor in neighbors:
+                            self.alpha[dp_idx][neighbor] += 1 / len(neighbors) / self.n_estimators
 
                 theta_0 = np.mean(self.data_weight[self.target])
                 res = fsolve(sum_moment_condition, theta_0, dp_idx)
