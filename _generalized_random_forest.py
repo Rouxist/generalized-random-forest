@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 from numpy.random import RandomState
 from scipy.optimize import fsolve
+from joblib import Parallel, delayed
 
 from _gradient_tree import GradientTree
 
@@ -57,12 +58,19 @@ class GRF:
         self.data_split = data.iloc[indices_val]
         
         # Fit gradient trees
+        trees = []
+        datas = []
         for i in range(self.n_estimators):
-            data_split_bootstrapped, _ = self.bootstrap_data(self.data_split)
-
             tree = GradientTree(idx=i+1, min_samples_leaf=self.min_samples_leaf, max_depth=self.max_depth)
-            tree.fit(data_split_bootstrapped, self.target)
-            self.tree_list.append(tree)
+            trees.append(tree)
+            data, _ = self.bootstrap_data(self.data_split)
+            datas.append(data)
+        
+        trees_fitted = Parallel(n_jobs=-1, backend="loky")(
+            delayed(tree.fit)(bootstrapped_data=data, target=self.target) 
+            for data, tree in zip(datas, trees))
+
+        self.tree_list.extend(trees_fitted)
     
     def predict(self, x:pd.Series) -> float:
         # Initialize weights of each data point in data_weight

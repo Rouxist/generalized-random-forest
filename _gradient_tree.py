@@ -218,6 +218,8 @@ class GradientTree:
     def fit(self, bootstrapped_data:pd.DataFrame, target:str) -> None:
         self.root = GradientNode(data_bootstrapped=bootstrapped_data, target=target, min_samples_leaf=self.min_samples_leaf, depth=1, max_depth=self.max_depth)
         self.root.split()
+
+        return self
     
     def predict(self, x:pd.Series) -> float | bool:
         self.searching_node = self.root
