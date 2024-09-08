@@ -20,6 +20,7 @@ class GradientNode:
     def __init__(self, data_bootstrapped:pd.DataFrame, target:str, min_samples_leaf:int=3, depth:int=1, max_depth:int=5) -> None:
         self.data = data_bootstrapped
         self.target = target
+        self.target_median = np.median(data_bootstrapped[target])
 
         # Hyperparameters
         self.min_samples_leaf = min_samples_leaf
@@ -42,7 +43,7 @@ class GradientNode:
             # Depends on Regression equation
             return np.mean((y-theta))
 
-        theta_0 = 5000 # random initial value
+        theta_0 = self.target_median # initial value
         res = fsolve(sum_moment_condition, theta_0)
         return res[0]
     
