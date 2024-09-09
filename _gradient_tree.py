@@ -17,14 +17,16 @@ class GradientNode:
 
     """
 
-    def __init__(self, data_bootstrapped:pd.DataFrame, target:str, min_samples_leaf:int=5, depth:int=1, max_depth:int=5) -> None:
+    def __init__(self, data_bootstrapped:pd.DataFrame, target:str, min_samples_leaf:int=5, depth:int=1, max_depth:int=5, min_balancedness_tol:float=0.45, random_state:int=None) -> None:
         self.data = data_bootstrapped
         self.target = target
         self.target_median = np.median(data_bootstrapped[target])
+        self.random_state = random_state
 
         # Hyperparameters
         self.min_samples_leaf = min_samples_leaf
         self.max_depth = max_depth
+        self.min_balancedness_tol = min_balancedness_tol
 
         # Attributes
         self.left = None
@@ -95,7 +97,11 @@ class GradientNode:
         return len(X_left_subset) * len(X_right_subset) / (len(self.data)**2) * ((theta_tilde_left - theta_tilde_right) ** 2)
     
     def get_all_splits(self) -> dict: 
-        features = self.data.columns
+        features = self.data.columns.to_numpy()
+        
+        rand_state = np.random.RandomState(self.random_state)
+        rand_state.shuffle(features)
+
         splits = {}
 
         for feature in features:
@@ -138,7 +144,8 @@ class GradientNode:
                 self.data[selected_feature] > split_point
             ]
 
-            if left_node_data.shape[0] >= self.min_samples_leaf and right_node_data.shape[0] >= self.min_samples_leaf:
+            if (left_node_data.shape[0] >= self.min_samples_leaf and right_node_data.shape[0] >= self.min_samples_leaf) \
+                and (min(left_node_data.shape[0], right_node_data.shape[0])/self.data.shape[0] > self.min_balancedness_tol):
                 is_possible_split = True
             else:
                 del delta_list[(selected_feature, split_point, 'continuous')]
@@ -157,15 +164,28 @@ class GradientNode:
             self.split_feature, self.split_point
         )
 
-        child_params = {
+        rand_state = np.random.RandomState(self.random_state)
+
+        left_child_params = {
             'target': self.target,
             'min_samples_leaf': self.min_samples_leaf,
             'depth': self.depth + 1,
-            'max_depth': self.max_depth
+            'max_depth': self.max_depth,
+            'min_balancedness_tol': 0.45, 
+            'random_state': rand_state.randint(0,10000) 
+        }
+        
+        right_child_params = {
+            'target': self.target,
+            'min_samples_leaf': self.min_samples_leaf,
+            'depth': self.depth + 1,
+            'max_depth': self.max_depth,
+            'min_balancedness_tol': 0.45, 
+            'random_state': rand_state.randint(0,10000) 
         }
 
-        self.left = GradientNode(left_node_data, **child_params)
-        self.right = GradientNode(right_node_data, **child_params)
+        self.left = GradientNode(left_node_data, **left_child_params)
+        self.right = GradientNode(right_node_data, **right_child_params)
 
         self.left.split()
         self.right.split()
@@ -225,15 +245,18 @@ class GradientNode:
         return lines, n + m + u, max(p, q) + 2, n + u // 2
 
 class GradientTree:
-    def __init__(self, idx:int=0, min_samples_leaf:int=3, max_depth:int=5) -> None:
+    def __init__(self, idx:int=0, min_samples_leaf:int=3, max_depth:int=5, min_balancedness_tol:float=0.45, random_state:int=None) -> None:
         self.root = None            # root node of the tree
         self.searching_node = None  # node being searched in prediction step
         self.idx = idx              # ID of the tree in the GRF
         self.min_samples_leaf = min_samples_leaf
         self.max_depth = max_depth
+        self.min_balancedness_tol = min_balancedness_tol
+        self.random_state = random_state
     
     def fit(self, bootstrapped_data:pd.DataFrame, target:str) -> None:
-        self.root = GradientNode(data_bootstrapped=bootstrapped_data, target=target, min_samples_leaf=self.min_samples_leaf, depth=1, max_depth=self.max_depth)
+        seed = np.random.RandomState(self.random_state).randint(0, 10000)
+        self.root = GradientNode(data_bootstrapped=bootstrapped_data, target=target, min_samples_leaf=self.min_samples_leaf, depth=1, max_depth=self.max_depth, random_state=seed)
         self.root.split()
 
         return self

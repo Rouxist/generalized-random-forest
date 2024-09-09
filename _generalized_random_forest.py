@@ -21,27 +21,31 @@ class GRF:
 
     """
     
-    def __init__(self, target:str, n_estimators:int=5, min_samples_leaf:int=3, max_depth:int=5, honest:bool=True, data_weight_ratio:float = 0.5, random_state:int=None) -> None:
+    def __init__(self, target:str, n_estimators:int=5, min_samples_leaf:int=3, max_depth:int=5, honest:bool=True, data_weight_ratio:float = 0.5, min_balancedness_tol:float=0.45, random_state:int=None) -> None:
         self.target = target                          # name of the target variable column
         
         # Hyperparameters
-        self.n_estimators = n_estimators              # # of the gradient trees to be fitted
-        self.honest = honest                          # honesty
-        self.data_weight_ratio = data_weight_ratio    # ratio of given dataset to be used when calculating weights for local estimation
-        self.min_samples_leaf = min_samples_leaf      # minimum numbers of datapoints required for a new leaf when splitting
-        self.max_depth = max_depth                    # max depth of branch of tree
-        self.random_state = RandomState(random_state) # RandomState object
+        self.n_estimators = n_estimators                  # # of the gradient trees to be fitted
+        self.honest = honest                              # honesty
+        self.data_weight_ratio = data_weight_ratio        # ratio of given dataset to be used when calculating weights for local estimation
+        self.min_samples_leaf = min_samples_leaf          # minimum numbers of datapoints required for a new leaf when splitting
+        self.max_depth = max_depth                        # max depth of branch of tree
+        self.random_state = RandomState(random_state)     # RandomState object
+        self.min_balancedness_tol = min_balancedness_tol  # 1. each child node must contain at least this portion of data points. 2. each tree is trained on this portion of whole train data.
         
         # Attributes
-        self.data_split = None                        # dataset to be used when applying splitting rules for each gradient tree
-        self.data_weight = None                       # dataset to be used when calculating weights; self.data_split and self.data_weight are disjoint 
-        self.tree_list = []                           # list of base estimators(gradient trees)
-        self.alpha = None                             # list of weights of data points in self.data_weight
+        self.data_split = None                            # dataset to be used when applying splitting rules for each gradient tree
+        self.data_weight = None                           # dataset to be used when calculating weights; self.data_split and self.data_weight are disjoint 
+        self.tree_list = []                               # list of base estimators(gradient trees)
+        self.alpha = None                                 # list of weights of data points in self.data_weight
     
-    def bootstrap_data(self, data:pd.DataFrame) -> tuple:
-        bootstrap_indices = list(self.random_state.choice(range(len(data)), len(data), replace = True))
+    def bootstrap_data(self, data:pd.DataFrame, random_state:int) -> tuple:
+        rand_state = np.random.RandomState(random_state)
+        bootstrap_indices = list(rand_state.choice(range(len(data)), len(data), replace = True))
         oob_indices = [i for i in range(len(data)) if i not in bootstrap_indices]
         data_bootstrap = data.iloc[bootstrap_indices] # to turn into ndarray, data.iloc[bootstrap_indices].values
+        n_bootstrapped_data = round(len(data_bootstrap) * self.min_balancedness_tol)
+        data_bootstrap = data_bootstrap.iloc[:n_bootstrapped_data]
         data_oob = data.iloc[oob_indices].values
 
         return data_bootstrap, data_oob
@@ -61,9 +65,10 @@ class GRF:
         trees = []
         datas = []
         for i in range(self.n_estimators):
-            tree = GradientTree(idx=i+1, min_samples_leaf=self.min_samples_leaf, max_depth=self.max_depth)
+            seed = self.random_state.randint(0,10000)
+            tree = GradientTree(idx=i+1, min_samples_leaf=self.min_samples_leaf, max_depth=self.max_depth, random_state=seed)
             trees.append(tree)
-            data, _ = self.bootstrap_data(self.data_split)
+            data, _ = self.bootstrap_data(data=self.data_split, random_state=seed)
             datas.append(data)
         
         trees_fitted = Parallel(n_jobs=-1, backend="loky")(
