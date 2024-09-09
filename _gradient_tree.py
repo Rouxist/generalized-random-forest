@@ -17,7 +17,7 @@ class GradientNode:
 
     """
 
-    def __init__(self, data_bootstrapped:pd.DataFrame, target:str, min_samples_leaf:int=3, depth:int=1, max_depth:int=5) -> None:
+    def __init__(self, data_bootstrapped:pd.DataFrame, target:str, min_samples_leaf:int=5, depth:int=1, max_depth:int=5) -> None:
         self.data = data_bootstrapped
         self.target = target
         self.target_median = np.median(data_bootstrapped[target])
@@ -127,16 +127,32 @@ class GradientNode:
             delta_list[key] = self.get_delta_tilde(split)
         
         selected_feature, split_point, _ = max(delta_list, key=delta_list.get)
+        
+        is_possible_split = False
+
+        while not is_possible_split:
+            left_node_data = self.data[
+                self.data[selected_feature] <= split_point
+            ]
+            right_node_data = self.data[
+                self.data[selected_feature] > split_point
+            ]
+
+            if left_node_data.shape[0] >= self.min_samples_leaf and right_node_data.shape[0] >= self.min_samples_leaf:
+                is_possible_split = True
+            else:
+                del delta_list[(selected_feature, split_point, 'continuous')]
+                if not delta_list:
+                    self.label = '({}), n_leaf: {}'.format(
+                    self.estimate, len(self.data))
+                    return
+                else:
+                    selected_feature, split_point, _ = max(delta_list, key=delta_list.get)
+
         self.split_feature = selected_feature
         self.split_point = split_point
-        
-        # Setup children nodes
-        left_node_data = self.data[
-            self.data[self.split_feature] <= self.split_point
-        ]
-        right_node_data = self.data[
-            self.data[self.split_feature] > self.split_point
-        ]
+
+
         self.label = "{} <= {}".format(
             self.split_feature, self.split_point
         )
