@@ -144,8 +144,8 @@ class GradientNode:
                 self.data[selected_feature] > split_point
             ]
 
-            if (left_node_data.shape[0] >= self.min_samples_leaf and right_node_data.shape[0] >= self.min_samples_leaf) \
-                and (min(left_node_data.shape[0], right_node_data.shape[0])/self.data.shape[0] > self.min_balancedness_tol):
+            if (left_node_data.shape[0] >= self.min_samples_leaf and right_node_data.shape[0] >= self.min_samples_leaf) :
+                # and (min(left_node_data.shape[0], right_node_data.shape[0])/self.data.shape[0] > self.min_balancedness_tol):
                 is_possible_split = True
             else:
                 del delta_list[(selected_feature, split_point, 'continuous')]
