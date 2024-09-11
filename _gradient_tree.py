@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+from collections import deque
 from numpy.linalg import inv
 from scipy.optimize import fsolve
 
@@ -89,8 +90,8 @@ class GradientNode:
         
         inv_a_p = self.get_inv_a_p(a_p)
         
-        theta_tilde_left = theta_p_hat - np.mean(xi.T @ inv_a_p @ psi_left)
-        theta_tilde_right = theta_p_hat - np.mean(xi.T @ inv_a_p @ psi_right)
+        # theta_tilde_left = theta_p_hat - np.mean(xi.T @ inv_a_p @ psi_left)
+        # theta_tilde_right = theta_p_hat - np.mean(xi.T @ inv_a_p @ psi_right)
 
         # print("\nX:\n", self.data)
         # print("\ny_left:\n", y_left_subset)
@@ -206,12 +207,12 @@ class GradientNode:
         self.left = GradientNode(left_node_data, **left_child_params)
         self.right = GradientNode(right_node_data, **right_child_params)
 
-        self.left.split()
-        self.right.split()
+        # self.left.split()
+        # self.right.split()
 
         return
 
-    def visualize(self, file_name:str, tree_idx:int) -> None:
+    def visualize(self, file_name:str, tree_idx:int=0) -> None:
         lines, _, _, _ = self._visualize_aux()
 
         with open("result/" + file_name, 'a') as file:
@@ -275,8 +276,18 @@ class GradientTree:
     
     def fit(self, bootstrapped_data:pd.DataFrame, target:str) -> None:
         seed = np.random.RandomState(self.random_state).randint(0, 10000)
-        self.root = GradientNode(data_bootstrapped=bootstrapped_data, target=target, min_samples_leaf=self.min_samples_leaf, depth=1, max_depth=self.max_depth, random_state=seed)
-        self.root.split()
+        root_node = GradientNode(data_bootstrapped=bootstrapped_data, target=target, min_samples_leaf=self.min_samples_leaf, depth=1, max_depth=self.max_depth, random_state=seed)
+        
+        queue = deque([root_node])
+        
+        while queue:
+            current_node = queue.popleft()
+            if current_node is not None:
+                current_node.split()
+                queue.append(current_node.left)
+                queue.append(current_node.right)
+
+        self.root = root_node
 
         return self
 
