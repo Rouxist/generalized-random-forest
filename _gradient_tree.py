@@ -54,9 +54,9 @@ class GradientNode:
         # Depends on Regression equation
         return np.array([np.mean([y_c - theta_hat_p])])
     
-    def get_single_psi(self, y_c: list, theta_hat_p: float) -> np.ndarray:
+    def get_psi_vec(self, y_c: list, theta_hat_p: float) -> np.ndarray:
         # Depends on Regression equation
-        return np.array([y_c - theta_hat_p])
+        return np.array(y_c) - theta_hat_p
     
     def get_xi(self) -> np.ndarray:
         # Depends on Regression equation
@@ -104,12 +104,11 @@ class GradientNode:
 
 
         # Partitioning scheme in algorithmical perspective
+        psi_left_vec = self.get_psi_vec(y_left_subset, theta_p_hat)
+        psi_right_vec = self.get_psi_vec(y_right_subset, theta_p_hat)
 
-        psi_left_vec = np.array([self.get_single_psi(y_value, theta_p_hat) for y_value in y_left_subset])
-        psi_right_vec = np.array([self.get_single_psi(y_value, theta_p_hat) for y_value in y_right_subset])
-
-        rho_left_vec = [-1 * (xi.T @ inv_a_p @ psi_element_left) for psi_element_left in psi_left_vec]
-        rho_right_vec = [-1 * (xi.T @ inv_a_p @ psi_element_right) for psi_element_right in psi_right_vec]
+        rho_left_vec = -1 * (xi.T @ inv_a_p @ psi_left_vec.reshape(-1, 1, 1))
+        rho_right_vec = -1 * (xi.T @ inv_a_p @ psi_right_vec.reshape(-1, 1, 1))
 
         rho_squared_sum_left = (1/len(psi_left)) * (np.sum(rho_left_vec)) ** 2
         rho_squared_sum_right = (1/len(psi_right)) * (np.sum(rho_right_vec)) ** 2
