@@ -6,4 +6,5 @@
 __pycache__
 dgp_test.py
 /test
+/econmltest
 /result

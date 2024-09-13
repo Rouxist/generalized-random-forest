@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+from numpy.random import RandomState
 from collections import deque
 from numpy.linalg import inv
 from scipy.optimize import fsolve
@@ -264,18 +265,41 @@ class GradientNode:
         return lines, n + m + u, max(p, q) + 2, n + u // 2
 
 class GradientTree:
-    def __init__(self, idx:int=0, min_samples_leaf:int=3, max_depth:int=5, min_balancedness_tol:float=0.45, random_state:int=None) -> None:
-        self.root = None            # root node of the tree
-        self.searching_node = None  # node being searched in prediction step
-        self.idx = idx              # ID of the tree in the GRF
+    def __init__(self, idx:int=0, min_samples_leaf:int=3, max_depth:int=5, min_balancedness_tol:float=0.45, honest:bool=True, random_state:int=None) -> None:
+        self.root = None                                    # root node of the tree
+        self.searching_node = None                          # node being searched in prediction step
+        self.idx = idx                                      # ID of the tree in the GRF
         self.min_samples_leaf = min_samples_leaf
         self.max_depth = max_depth
         self.min_balancedness_tol = min_balancedness_tol
-        self.random_state = random_state
+        self.honest = honest
+        self.seed = random_state
+        self.random_state = RandomState(random_state)
     
     def fit(self, bootstrapped_data:pd.DataFrame, target:str) -> None:
-        seed = np.random.RandomState(self.random_state).randint(0, 10000)
-        root_node = GradientNode(data_bootstrapped=bootstrapped_data, target=target, min_samples_leaf=self.min_samples_leaf, depth=1, max_depth=self.max_depth, random_state=seed)
+        if self.idx ==3:
+            print("(scratch) data:\n", bootstrapped_data)
+        self.data = bootstrapped_data
+        self.data_indices = bootstrapped_data.index
+        n_samples = len(self.data)
+        auxil_indices = np.arange(n_samples, dtype=np.intp)
+
+        if self.honest:
+            self.random_state.shuffle(auxil_indices)
+            
+            self.indices_split, self.indices_weight = auxil_indices[:n_samples // 2], auxil_indices[n_samples // 2:]
+        else:
+            self.indices_split, self.indices_weight = auxil_indices, auxil_indices
+        
+        # print(f"(econml)tree with seed {self.random_seed} got this indices:\n{self.indices_split}")
+
+        root_node = GradientNode(data_bootstrapped=self.data.iloc[self.indices_split], 
+                                 target=target, 
+                                 min_samples_leaf=self.min_samples_leaf, 
+                                 depth=1, 
+                                 max_depth=self.max_depth, 
+                                 random_state=1 # To-Do
+                                 )
         
         queue = deque([root_node])
         
@@ -290,34 +314,41 @@ class GradientTree:
 
         return self
 
-    def predict(self, X: pd.DataFrame|pd.Series) -> list[float | bool]:
-        if X.ndim == 1:
+    def predict(self, is_own_weight_set:bool, X: pd.DataFrame|pd.Series=None, col_names:list=None) -> list[float | bool]:
+        if not is_own_weight_set:
+            data = X
+        else: 
+            data = self.data.iloc[self.indices_weight]   # classifying this tree's own weight data
+            data = data.iloc[:,1:]                       # remove target column
+            data.columns = pd.Index(col_names)           # why do columns' names get shuffled
+
+        if data.ndim == 1: 
             self.searching_node = self.root
         
             while self.searching_node:
                 if not self.searching_node.left and not self.searching_node.right:
                     return self.searching_node.estimate
                 
-                elif X[self.searching_node.split_feature] <= self.searching_node.split_point:
+                elif data[self.searching_node.split_feature] <= self.searching_node.split_point:
                     if self.searching_node.left is not None:
                         self.searching_node = self.searching_node.left
                     else:
                         return False
                 
-                elif X[self.searching_node.split_feature] > self.searching_node.split_point:
+                elif data[self.searching_node.split_feature] > self.searching_node.split_point:
                     if self.searching_node.right is not None:
                         self.searching_node = self.searching_node.right
                     else:
                         return False
 
         else:
-            feature_idx = {col:idx for idx, col in enumerate(X.columns)}
-            X = X.to_numpy()  # Convert DataFrame to numpy array
-            num_samples = X.shape[0]
+            feature_idx = {col:idx for idx, col in enumerate(data.columns)}
+            data = data.to_numpy()  # Convert DataFrame to numpy array
+            num_samples = data.shape[0]
             predictions = np.empty(num_samples, dtype=object)
 
             for i in range(num_samples):
-                x = X[i]
+                x = data[i]
                 self.searching_node = self.root
                 
                 while self.searching_node:
@@ -339,7 +370,11 @@ class GradientTree:
                             predictions[i] = False
                             break
             
-            return predictions
+            if not is_own_weight_set:
+                return predictions
+            else:
+                # print("now returning zip:\n",self.data_indices[self.indices_weight], predictions)
+                return self.data_indices[self.indices_weight].to_list(), predictions
 
     def visualize(self, file_name:str) -> None:
         self.root.visualize(file_name, self.idx)
