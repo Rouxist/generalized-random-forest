@@ -37,8 +37,6 @@ class GRF:
         self.max_samples = max_samples                    # each tree is trained on this portion of whole train data.
         
         # Attributes
-        # self.data_split = None                            # dataset to be used when applying splitting rules for each gradient tree
-        # self.data_weight = None                           # dataset to be used when calculating weights; self.data_split and self.data_weight are disjoint 
         self.tree_list = []                               # list of base estimators(gradient trees)
         self.alpha = None                                 # list of weights of data points in self.data_weight
         
@@ -57,6 +55,7 @@ class GRF:
         slice_indices = []
 
         half_sample_inds = subsample_random_state.choice(n_samples, n_samples // 2, replace=False)
+        print("(scratch)half_sample_inds=",half_sample_inds)
         slice_indices.extend([half_sample_inds[subsample_random_state.choice(n_samples // 2,
                                                                         n_samples_subsample,
                                                                         replace=False)]
@@ -77,7 +76,7 @@ class GRF:
         self.tree_list.extend(trees_fitted)
     
     def predict(self, x:pd.DataFrame|pd.Series) -> float:
-        data_weight_list = [self.tree_list[i].data.iloc[self.tree_list[i].indices_weight] for i in range(self.n_estimators)]
+        data_weight_list = [self.tree_list[i].data_parent.iloc[self.tree_list[i].indices_val] for i in range(self.n_estimators)]
     
         for split_data in data_weight_list:
             split_data.columns = self.data_columns # why do columns' names get shuffled

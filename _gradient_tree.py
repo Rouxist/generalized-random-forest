@@ -4,6 +4,7 @@ from numpy.random import RandomState
 from collections import deque
 from numpy.linalg import inv
 from scipy.optimize import fsolve
+from _splitter import BestSplitter
 
 class GradientNode:
     """
@@ -19,10 +20,10 @@ class GradientNode:
 
     """
 
-    def __init__(self, data_bootstrapped:pd.DataFrame, target:str, min_samples_leaf:int=5, depth:int=1, max_depth:int=5, min_balancedness_tol:float=0.45, random_state:int=None) -> None:
-        self.data = data_bootstrapped
+    def __init__(self, data_train:pd.DataFrame, data_val:pd.DataFrame, target:str, min_samples_leaf:int=5, depth:int=1, max_depth:int=5, min_balancedness_tol:float=0.45, random_state:int=None) -> None:
+        self.data_train = data_train
+        self.data_val = data_val
         self.target = target
-        self.target_median = np.median(data_bootstrapped[target])
         self.random_state = random_state
 
         # Hyperparameters
@@ -37,144 +38,27 @@ class GradientNode:
         self.split_feature = ''
         self.split_point = 0
         self.label = ''
-        self.estimate = self.get_theta_p_hat()
-
-    def get_theta_p_hat(self) -> float:
-        
-        def sum_moment_condition(theta) -> float:  # Eq (4)
-            y = self.data[self.target]
-
-            # Depends on Regression equation
-            return np.mean((y-theta))
-
-        theta_0 = self.target_median # initial value
-        res = fsolve(sum_moment_condition, theta_0)
-        return res[0]
-    
-    def get_psi(self, y_c: list, theta_hat_p: float) -> np.ndarray:
-        # Depends on Regression equation
-        return np.array([np.mean([y_c - theta_hat_p])])
-    
-    def get_psi_vec(self, y_c: list, theta_hat_p: float) -> np.ndarray:
-        # Depends on Regression equation
-        return np.array(y_c) - theta_hat_p
-    
-    def get_xi(self) -> np.ndarray:
-        # Depends on Regression equation
-        return np.array([1])
-    
-    def get_a_p(self, y_c: list, theta_hat_p: float) -> np.ndarray:
-        # Depends on Regression equation
-        return np.array([[-1]])
-    
-    def get_inv_a_p(self, a_p: np.ndarray) -> np.ndarray:
-        if len(a_p) == 1:
-            return 1/a_p
-        else:
-            return inv(a_p)
-
-    def get_delta_tilde(self, left_subset:pd.DataFrame) -> float:
-        X_left_subset = left_subset.drop(self.target, axis=1)
-        y_left_subset = left_subset[self.target]
-
-        X_right_subset = self.data.drop(X_left_subset.index, axis=0)
-        X_right_subset = X_right_subset.drop(self.target, axis=1)
-        y_right_subset = self.data.drop(y_left_subset.index, axis=0)
-        y_right_subset = y_right_subset[self.target]
-
-        theta_p_hat = self.get_theta_p_hat() # for y_i = b + u_i, it equals to mean of y_P
-
-        xi = self.get_xi()
-        a_p = self.get_a_p(self.data[self.target], theta_p_hat)
-        psi_left = self.get_psi(y_left_subset, theta_p_hat)
-        psi_right = self.get_psi(y_right_subset, theta_p_hat)
-        
-        inv_a_p = self.get_inv_a_p(a_p)
-        
-        # theta_tilde_left = theta_p_hat - np.mean(xi.T @ inv_a_p @ psi_left)
-        # theta_tilde_right = theta_p_hat - np.mean(xi.T @ inv_a_p @ psi_right)
-
-        # print("\nX:\n", self.data)
-        # print("\ny_left:\n", y_left_subset)
-        # print("\n\ny_right:\n", y_right_subset)
-        # print(f"\n xi: {xi}, inv_a_p: {inv_a_p}, psi_left: {psi_left}, psi_right: {psi_right}")
-        # print(f"len(X_left_subset): {len(X_left_subset)},  len(X_right_subset): {len(X_right_subset)}, len(self.data): {len(self.data)}, theta_tilde_left: {theta_tilde_left}, theta_tilde_right: {theta_tilde_right}")
-
-        # return len(X_left_subset) * len(X_right_subset) / (len(self.data)**2) * ((theta_tilde_left - theta_tilde_right) ** 2)
-        
-
-
-        # Partitioning scheme in algorithmical perspective
-        psi_left_vec = self.get_psi_vec(y_left_subset, theta_p_hat)
-        psi_right_vec = self.get_psi_vec(y_right_subset, theta_p_hat)
-
-        rho_left_vec = -1 * (xi.T @ inv_a_p @ psi_left_vec.reshape(-1, 1, 1))
-        rho_right_vec = -1 * (xi.T @ inv_a_p @ psi_right_vec.reshape(-1, 1, 1))
-
-        rho_squared_sum_left = (1/len(psi_left)) * (np.sum(rho_left_vec)) ** 2
-        rho_squared_sum_right = (1/len(psi_right)) * (np.sum(rho_right_vec)) ** 2
-
-        return rho_squared_sum_left + rho_squared_sum_right
-    
-    def get_all_splits(self) -> dict: 
-        features = self.data.columns.to_numpy()
-        
-        rand_state = np.random.RandomState(self.random_state)
-        rand_state.shuffle(features)
-
-        splits = {}
-
-        for feature in features:
-            if feature == self.target:
-                continue
-            for unique in self.data[feature].unique():
-                length_subset = len(self.data[self.data[feature] <= unique])
-                if length_subset != 0 and length_subset != len(self.data):
-                    splits[(feature, unique, 'continuous')] = self.data[self.data[feature] <= unique]
-        return splits
+        self.splitter = BestSplitter(data_train=self.data_train, 
+                                     data_val=self.data_val, 
+                                     target=self.target, 
+                                     min_samples_leaf=self.min_samples_leaf,
+                                     max_depth=self.max_depth,
+                                     min_balancedness_tol=0.45)
+        self.estimate = self.splitter.criterion.get_theta_p_hat(y_parent=self.data_train[self.target].to_numpy())
 
     def split(self) -> None:
         # Terminal Condition
         if (self.depth >= self.max_depth or 
-            len(self.data) <= self.min_samples_leaf or
-            len(self.data.drop_duplicates()) <= 1
+            len(self.data_train) <= 2 * self.min_samples_leaf or
+            len(self.data_train.drop_duplicates()) <= 1
             ):
 
             self.label = '({}), n_leaf: {}'.format(
-                self.estimate, len(self.data))
+                self.estimate, len(self.data_train))
             return
 
         # Find split point
-        splits = self.get_all_splits()
-
-        delta_list = {}
-
-        for key, split in splits.items():
-            delta_list[key] = self.get_delta_tilde(split)
-        
-        selected_feature, split_point, _ = max(delta_list, key=delta_list.get)
-        
-        is_possible_split = False
-
-        while not is_possible_split:
-            left_node_data = self.data[
-                self.data[selected_feature] <= split_point
-            ]
-            right_node_data = self.data[
-                self.data[selected_feature] > split_point
-            ]
-
-            if (left_node_data.shape[0] >= self.min_samples_leaf and right_node_data.shape[0] >= self.min_samples_leaf) :
-                # and (min(left_node_data.shape[0], right_node_data.shape[0])/self.data.shape[0] > self.min_balancedness_tol):
-                is_possible_split = True
-            else:
-                del delta_list[(selected_feature, split_point, 'continuous')]
-                if not delta_list:
-                    self.label = '({}), n_leaf: {}'.format(
-                    self.estimate, len(self.data))
-                    return
-                else:
-                    selected_feature, split_point, _ = max(delta_list, key=delta_list.get)
+        selected_feature, split_point, p, p_val = self.splitter.get_best_node_split()
 
         self.split_feature = selected_feature
         self.split_point = split_point
@@ -186,7 +70,15 @@ class GradientNode:
 
         rand_state = np.random.RandomState(self.random_state)
 
+        sorted_data = self.data_train.copy()
+        sorted_data = sorted_data.sort_values(selected_feature)
+        
+        sorted_data_val = self.data_val.copy()
+        sorted_data_val = sorted_data_val.sort_values(selected_feature)
+
         left_child_params = {
+            'data_train' : sorted_data[:p],
+            'data_val' : sorted_data_val[:p_val],
             'target': self.target,
             'min_samples_leaf': self.min_samples_leaf,
             'depth': self.depth + 1,
@@ -196,6 +88,8 @@ class GradientNode:
         }
         
         right_child_params = {
+            'data_train' : sorted_data[p:],
+            'data_val' : sorted_data_val[p_val:],
             'target': self.target,
             'min_samples_leaf': self.min_samples_leaf,
             'depth': self.depth + 1,
@@ -204,11 +98,8 @@ class GradientNode:
             'random_state': rand_state.randint(0,10000) 
         }
 
-        self.left = GradientNode(left_node_data, **left_child_params)
-        self.right = GradientNode(right_node_data, **right_child_params)
-
-        # self.left.split()
-        # self.right.split()
+        self.left = GradientNode(**left_child_params)
+        self.right = GradientNode(**right_child_params)
 
         return
 
@@ -277,23 +168,21 @@ class GradientTree:
         self.random_state = RandomState(random_state)
     
     def fit(self, bootstrapped_data:pd.DataFrame, target:str) -> None:
-        if self.idx ==3:
-            print("(scratch) data:\n", bootstrapped_data)
-        self.data = bootstrapped_data
+
+        self.data_parent = bootstrapped_data
         self.data_indices = bootstrapped_data.index
-        n_samples = len(self.data)
+        n_samples = len(bootstrapped_data)
         auxil_indices = np.arange(n_samples, dtype=np.intp)
 
         if self.honest:
             self.random_state.shuffle(auxil_indices)
             
-            self.indices_split, self.indices_weight = auxil_indices[:n_samples // 2], auxil_indices[n_samples // 2:]
+            self.indices_train, self.indices_val = auxil_indices[:n_samples // 2], auxil_indices[n_samples // 2:]
         else:
-            self.indices_split, self.indices_weight = auxil_indices, auxil_indices
-        
-        # print(f"(econml)tree with seed {self.random_seed} got this indices:\n{self.indices_split}")
+            self.indices_train, self.indices_val = auxil_indices, auxil_indices
 
-        root_node = GradientNode(data_bootstrapped=self.data.iloc[self.indices_split], 
+        root_node = GradientNode(data_train=self.data_parent.iloc[self.indices_train], 
+                                 data_val=self.data_parent.iloc[self.indices_val], 
                                  target=target, 
                                  min_samples_leaf=self.min_samples_leaf, 
                                  depth=1, 
@@ -318,7 +207,7 @@ class GradientTree:
         if not is_own_weight_set:
             data = X
         else: 
-            data = self.data.iloc[self.indices_weight]   # classifying this tree's own weight data
+            data = self.data_parent.iloc[self.indices_val]   # classifying this tree's own weight data
             data = data.iloc[:,1:]                       # remove target column
             data.columns = pd.Index(col_names)           # why do columns' names get shuffled
 
@@ -373,8 +262,8 @@ class GradientTree:
             if not is_own_weight_set:
                 return predictions
             else:
-                # print("now returning zip:\n",self.data_indices[self.indices_weight], predictions)
-                return self.data_indices[self.indices_weight].to_list(), predictions
+                # print("now returning zip:\n",self.data_indices[self.indices_val], predictions)
+                return self.data_indices[self.indices_val].to_list(), predictions
 
     def visualize(self, file_name:str) -> None:
         self.root.visualize(file_name, self.idx)
