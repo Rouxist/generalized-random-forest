@@ -50,17 +50,20 @@ class GRF:
 
         n_samples = len(data)
         n_samples_subsample = int(np.floor(n_samples * self.max_samples))
-        print("n_samples_subsample:",n_samples_subsample)
+
+        subforest_size = 4 # not parameterized yet
+        n_groups = self.n_estimators // subforest_size
+        estimator_idx_groups = np.array_split(np.arange(0, self.n_estimators), n_groups)
 
         slice_indices = []
 
-        half_sample_inds = subsample_random_state.choice(n_samples, n_samples // 2, replace=False)
-        print("(scratch)half_sample_inds=",half_sample_inds)
-        slice_indices.extend([half_sample_inds[subsample_random_state.choice(n_samples // 2,
-                                                                        n_samples_subsample,
-                                                                        replace=False)]
-                            for _ in range(self.n_estimators)])
-        
+        for estimator_indices in estimator_idx_groups:
+            half_sample_inds = subsample_random_state.choice(n_samples, n_samples // 2, replace=False)
+            slice_indices.extend([half_sample_inds[subsample_random_state.choice(n_samples // 2,
+                                                                            n_samples_subsample,
+                                                                            replace=False)]
+                                for _ in range(len(estimator_indices))])
+
         # Fit gradient trees
         trees = []
 
