@@ -49,7 +49,7 @@ class GradientNode:
     def split(self) -> None:
         # Terminal Condition
         if (self.depth >= self.max_depth or 
-            len(self.data_train) <= 2 * self.min_samples_leaf or
+            len(self.data_train) < 2 * self.min_samples_leaf or
             len(self.data_train.drop_duplicates()) <= 1
             ):
 
@@ -62,6 +62,13 @@ class GradientNode:
 
         self.split_feature = selected_feature
         self.split_point = split_point
+
+        # Identify this node as leaf if none of the split point candidates was valid
+        if (p==0 or p_val==0 or p==len(self.data_train)-1 or p_val==len(self.data_val)-1):
+
+            self.label = '({}), n_leaf: {}'.format(
+                self.estimate, len(self.data_train))
+            return
 
 
         self.label = "{} <= {}".format(
