@@ -192,7 +192,7 @@ class GradientTree:
                                  data_val=self.data_parent.iloc[self.indices_val], 
                                  target=target, 
                                  min_samples_leaf=self.min_samples_leaf, 
-                                 depth=1, 
+                                 depth=0, 
                                  max_depth=self.max_depth, 
                                  random_state=1 # To-Do
                                  )
