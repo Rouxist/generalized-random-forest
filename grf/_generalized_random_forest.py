@@ -4,7 +4,7 @@ from numpy.random import RandomState
 from scipy.optimize import fsolve
 from joblib import Parallel, delayed
 
-from _gradient_tree import GradientTree
+from ._gradient_tree import GradientTree
 
 MAX_INT = np.iinfo(np.int32).max
 
@@ -41,9 +41,9 @@ class GRF:
         self.alpha = None                                 # list of weights of data points in self.data_weight
         
     def fit(self, data:pd.DataFrame) -> None:
-        self.data_columns = data.columns
+        self.data_columns = [self.target]+['X' + str(i+1) for i in range(1, data.shape[1])] # when dependent variable has dimension of 1
         self.subsample_random_state_seed = self.random_state.randint(MAX_INT) # `self.subsample_random_seed_` of econml _base_grf.py
-        print("random state for sampling subsample (from scratch):",self.subsample_random_state_seed)
+        # print("random state for sampling subsample (from scratch):",self.subsample_random_state_seed)
         subsample_random_state = np.random.RandomState(self.subsample_random_state_seed)
 
         # Subsample generation
@@ -113,7 +113,24 @@ class GRF:
             # theta_0 = np.mean(self.data_weight[self.target])
             # res = fsolve(sum_moment_condition, theta_0, 0)
             # return res[0]
-            pass # To-Do
+            # pass # To-Do
+            estimate_given_dps = [tree.predict(is_own_weight_set=False, X=x) for tree in self.tree_list] # length of n_estimator and each element has length of given datapoints
+            for tree_idx, tree in enumerate(self.tree_list):
+                # estimate_given_dp = tree.predict(is_own_weight_set=False, X=x)
+                # print("estimate_given_dp=",estimate_given_dp)
+                indices, preds = tree.predict(is_own_weight_set=True, col_names=x.columns)
+                # neighbors = [idx for (idx, weight_data_estim) in enumerate(multi) if estimate_given_dp==weight_data_estim]
+                prediction_pairs = zip(indices, preds)
+                neighbors = [idx for (idx, weight_data_estim) in prediction_pairs if estimate_given_dps[tree_idx][0]==weight_data_estim]
+
+                # Update weights
+                if len(neighbors) > 0:
+                    for neighbor_idx in neighbors:
+                        self.alpha[0][whole_data_weight_indices.index(neighbor_idx)] += 1 / len(neighbors) / self.n_estimators
+
+            theta_0 = np.mean(whole_data_weight[self.target])
+            res = fsolve(sum_moment_condition, theta_0, 0)
+            return res[0]
         else:
             # simply iterates datapoint with time complexity O(n)
             estimate_given_dps = [tree.predict(is_own_weight_set=False, X=x) for tree in self.tree_list] # length of n_estimator and each element has length of given datapoints

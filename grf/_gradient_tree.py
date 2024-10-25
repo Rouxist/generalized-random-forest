@@ -3,8 +3,7 @@ import numpy as np
 from numpy.random import RandomState
 from collections import deque
 from numpy.linalg import inv
-from scipy.optimize import fsolve
-from _splitter import BestSplitter
+from ._splitter import BestSplitter
 
 class GradientNode:
     """

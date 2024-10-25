@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from _criterion import GRFCriterion
+from ._criterion import GRFCriterion
 
 class BestSplitter:
     def __init__(self, data_train:pd.DataFrame, data_val:pd.DataFrame, target:str, min_samples_leaf:int=5, max_depth:int=5, min_balancedness_tol:float=0.45, honest:bool=True) -> None:
@@ -8,7 +8,7 @@ class BestSplitter:
         self.data_val = data_val
         self.target = target
         feature_list = self.data_train.columns.to_list()
-        feature_list.remove("price")
+        feature_list.remove(target)
         self.features = feature_list
         self.indices = self.data_train.index
         self.indices_val = self.data_val.index
