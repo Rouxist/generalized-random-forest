@@ -12,15 +12,14 @@ import os
 ### functional setup
 FROM_SCRATCH_MODEL = True
 ECONML_MODEL = True
-MEASURE_TIME = False
 SHOW_DATA = False
 SHOW_T_VAR = False
 SHOW_PLOT = False
 
 ### Experiment setup
-T = 240
+T = 20
 N_FEATURES = 10
-N_ESTIMATORS = 20
+N_ESTIMATORS = 16
 N_ITER = 10
 TARGET_NAME = 'y'
 
@@ -163,8 +162,7 @@ if __name__ == "__main__":
                                          random_state=arr_seed[idx])
             start_time = time.time()
             grf_econml.fit(X=X, y=y)
-            if MEASURE_TIME:
-                print(f"Time taken from EconML model(fit): {time.time() - start_time:.5f} sec\n\n")
+            time_taken = time.time() - start_time
 
             beta_1_hat = grf_econml.predict(beta_1_test_x)
             beta_2_hat = grf_econml.predict(beta_2_test_x)
@@ -178,7 +176,7 @@ if __name__ == "__main__":
         print("                                   Experiment Result                                  ")
         print("======================================================================================")
         print("{:<25}: {:>15}  {:<25}: {:>15}".format("Date", time_now_date,"Time", time_now_zone + " " + time_now_time))
-        print("{:<25}: {:>15}".format("Model", "EconML"))
+        print("{:<25}: {:>15}  {:<25}: {:>11.2f} sec".format("Model", "Scratch", "Time taken", time_taken))
         print()
         print("{:<25}: {:>15.5}  {:<25}: {:>15.5}".format("Mean of beta1 hat", np.mean(arr_estimated_beta_1),"Std. dev. of beta1 hat", np.std(arr_estimated_beta_1)))
         print("{:<25}: {:>15.5}  {:<25}: {:>15.5}".format("Mean of beta2 hat", np.mean(arr_estimated_beta_2),"Std. dev. of beta2 hat", np.std(arr_estimated_beta_2)))
@@ -214,8 +212,7 @@ if __name__ == "__main__":
             start_time = time.time()
             grf_scratch.fit(df)
             # grf.visualize(file_name='scratch_trees_visualized.txt')
-            if MEASURE_TIME:
-                print(f"Time taken from Scratch model(fit): {time.time() - start_time:.5f} sec\n\n")
+            time_taken = time.time() - start_time
             
             beta_1_hat = grf_scratch.predict(beta_1_test_x)
             beta_2_hat = grf_scratch.predict(beta_2_test_x)
@@ -229,7 +226,7 @@ if __name__ == "__main__":
         print("                                   Experiment Result                                  ")
         print("======================================================================================")
         print("{:<25}: {:>15}  {:<25}: {:>15}".format("Date", time_now_date,"Time", time_now_zone + " " + time_now_time))
-        print("{:<25}: {:>15}".format("Model", "Scratch"))
+        print("{:<25}: {:>15}  {:<25}: {:>11.2f} sec".format("Model", "Scratch", "Time taken", time_taken))
         print()
         print("{:<25}: {:>15.5}  {:<25}: {:>15.5}".format("Mean of beta1 hat", np.mean(arr_estimated_beta_1),"Std. dev. of beta1 hat", np.std(arr_estimated_beta_1)))
         print("{:<25}: {:>15.5}  {:<25}: {:>15.5f}".format("Mean of beta2 hat", np.mean(arr_estimated_beta_2),"Std. dev. of beta2 hat", np.std(arr_estimated_beta_2)))
