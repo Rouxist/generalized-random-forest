@@ -5,22 +5,24 @@ from econmltest.EconML.econml.grf import RegressionForest
 import matplotlib.pyplot as plt
 from collections import Counter
 import time
+from tqdm import tqdm
 
 import os
 
 ## Setup
 ### functional setup
 FROM_SCRATCH_MODEL = True
-ECONML_MODEL = True
+FROM_SCRATCH_MODEL_P = False
+ECONML_MODEL = False
 SHOW_DATA = False
 SHOW_T_VAR = False
-SHOW_PLOT = False
+SHOW_PLOT = True
 
 ### Experiment setup
-T = 20
+T = 60
 N_FEATURES = 10
-N_ESTIMATORS = 16
-N_ITER = 10
+N_ESTIMATORS = 4
+N_ITER = 1
 TARGET_NAME = 'y'
 
 BLOCK_SIZE = 1 # 1 if when not using block sampling
@@ -151,8 +153,9 @@ if __name__ == "__main__":
         arr_estimated_beta_1 = []
         arr_estimated_beta_2 = []
 
+        start_time = time.time()
         
-        for idx in range(N_ITER):
+        for idx in tqdm(range(N_ITER)):
             # Model from EconML
             grf_econml = RegressionForest(n_estimators=N_ESTIMATORS, 
                                          honest=True, 
@@ -160,15 +163,15 @@ if __name__ == "__main__":
                                          max_depth=5, 
                                          max_features="auto", 
                                          random_state=arr_seed[idx])
-            start_time = time.time()
             grf_econml.fit(X=X, y=y)
-            time_taken = time.time() - start_time
 
             beta_1_hat = grf_econml.predict(beta_1_test_x)
             beta_2_hat = grf_econml.predict(beta_2_test_x)
             
             arr_estimated_beta_1.append(beta_1_hat)
             arr_estimated_beta_2.append(beta_2_hat)
+
+        time_taken = time.time() - start_time
 
         arr_estimated_beta_1 = [i.tolist()[0][0] for i in arr_estimated_beta_1]
         arr_estimated_beta_2 = [i.tolist()[0][0] for i in arr_estimated_beta_2]
@@ -192,14 +195,16 @@ if __name__ == "__main__":
             axes[1].set_title('Histogram of List 2')
 
             plt.tight_layout()
-            plt.show()
+            plt.savefig(f"./result/block_{BLOCK_SIZE}__rho_{RHO}.png")
 
 
     if FROM_SCRATCH_MODEL:
         arr_estimated_beta_1 = []
         arr_estimated_beta_2 = []
 
-        for idx in range(N_ITER):
+        start_time = time.time()
+
+        for idx in tqdm(range(N_ITER)):
             # Model from EconML
             grf_scratch = GRF(target=TARGET_NAME, 
                               n_estimators=N_ESTIMATORS, 
@@ -208,17 +213,18 @@ if __name__ == "__main__":
                               max_samples=0.45, 
                               honest=True, 
                               data_weight_ratio=0.5, 
+                              block_size=BLOCK_SIZE,
                               random_state=arr_seed[idx])
-            start_time = time.time()
             grf_scratch.fit(df)
             # grf.visualize(file_name='scratch_trees_visualized.txt')
-            time_taken = time.time() - start_time
             
             beta_1_hat = grf_scratch.predict(beta_1_test_x)
             beta_2_hat = grf_scratch.predict(beta_2_test_x)
             
             arr_estimated_beta_1.append(beta_1_hat)
             arr_estimated_beta_2.append(beta_2_hat)
+        
+        time_taken = time.time() - start_time
         
         arr_estimated_beta_1 = [i.tolist() for i in arr_estimated_beta_1]
         arr_estimated_beta_2 = [i.tolist() for i in arr_estimated_beta_2]
@@ -242,4 +248,4 @@ if __name__ == "__main__":
             axes[1].set_title('Histogram of List 2')
 
             plt.tight_layout()
-            plt.show()
+            plt.savefig(f"./result/block_{BLOCK_SIZE}__rho_{RHO}.png")

@@ -23,7 +23,7 @@ class GRF:
 
     """
     
-    def __init__(self, target:str, n_estimators:int=5, min_samples_leaf:int=3, max_depth:int=5, honest:bool=True, data_weight_ratio:float = 0.5, max_samples:float=.45, random_state:int=None) -> None:
+    def __init__(self, target:str, n_estimators:int=5, min_samples_leaf:int=3, max_depth:int=5, honest:bool=True, data_weight_ratio:float = 0.5, max_samples:float=.45, block_size:int=1, random_state:int=None) -> None:
         self.target = target                          # name of the target variable column
         
         # Hyperparameters
@@ -35,6 +35,7 @@ class GRF:
         self.seed = random_state                          # seed
         self.random_state = RandomState(random_state)     # RandomState object
         self.max_samples = max_samples                    # each tree is trained on this portion of whole train data.
+        self.block_size = block_size                      # block size to be used as a parameter of block sampling.
         
         # Attributes
         self.tree_list = []                               # list of base estimators(gradient trees)
@@ -50,6 +51,7 @@ class GRF:
 
         n_samples = len(data)
         n_samples_subsample = int(np.floor(n_samples * self.max_samples))
+        n_blocks = int(n_samples_subsample // self.block_size) + 1
 
         subforest_size = 4 # not parameterized yet
         n_groups = self.n_estimators // subforest_size
@@ -58,11 +60,14 @@ class GRF:
         slice_indices = []
 
         for estimator_indices in estimator_idx_groups:
-            half_sample_inds = subsample_random_state.choice(n_samples, n_samples // 2, replace=False)
-            slice_indices.extend([half_sample_inds[subsample_random_state.choice(n_samples // 2,
-                                                                            n_samples_subsample,
-                                                                            replace=False)]
-                                for _ in range(len(estimator_indices))])
+            for _ in range(len(estimator_indices)):
+                block_start_indices = subsample_random_state.choice(n_samples - self.block_size + 1, n_blocks, replace=False)
+                block_sampled_data = []
+                for start_idx in block_start_indices:
+                    block_sampled_data.extend([i for i in range(start_idx, start_idx + self.block_size)])
+                block_sampled_data = np.array(block_sampled_data)
+                block_sampled_data = block_sampled_data[:n_samples_subsample]
+                slice_indices.append(block_sampled_data)
 
         # Fit gradient trees
         trees = []
