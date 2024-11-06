@@ -1,9 +1,23 @@
-import numpy as np
+"""
+BestSplitter
+"""
+
 import pandas as pd
 from ._criterion import GRFCriterion
 
 class BestSplitter:
-    def __init__(self, data_train:pd.DataFrame, data_val:pd.DataFrame, target:str, min_samples_leaf:int=5, max_depth:int=5, min_balancedness_tol:float=0.45, honest:bool=True) -> None:
+    """
+    Finds best split point.
+
+    ### Methods
+
+    self.indices
+        indices from original dataset
+    
+    """
+    def __init__(self, data_train:pd.DataFrame, data_val:pd.DataFrame,
+                 target:str, min_samples_leaf:int=5, max_depth:int=5,
+                 min_balancedness_tol:float=0.45, honest:bool=True) -> None:
         self.data_train = data_train
         self.data_val = data_val
         self.target = target
@@ -25,6 +39,9 @@ class BestSplitter:
         self.criterion = GRFCriterion()
 
     def get_best_node_split(self) -> tuple:
+        """
+        Finds best split given data in the node
+        """
         # actual_idx = {i:idx for i, idx in enumerate(self.indices)}
         # actual_idx_val = {i:idx for i, idx in enumerate(self.indices_val)}
 
@@ -37,18 +54,19 @@ class BestSplitter:
         for feature in self.features:
             if feature == self.target:
                 continue
-            Xf = self.data_train[feature].copy().sort_values()
-            Xf_val = self.data_val[feature].copy().sort_values()
+            Xf = self.data_train[feature].copy().sort_values()     # pylint: disable=C0103
+            Xf_val = self.data_val[feature].copy().sort_values()   # pylint: disable=C0103
 
             # explore all possible splits of the feature
             p, p_val = 0, 0
 
             while p < self.n_data - 1 and p_val < self.n_data_val - 1:
-                p += 1 # if indices of left-child-data is 0 1 2 and that of right-child-data is 3 4 5, than p=3
+                p += 1   # if indices of left-child-data is 0 1 2 and
+                         # that of right-child-data is 3 4 5, than p=3
 
                 if Xf.iloc[p-1] == Xf.iloc[p]:
                     continue
-                
+
                 split_point = Xf.iloc[p-1] / 2.0 + Xf.iloc[p] / 2.0 # split point candidate
 
                 if self.honest:
@@ -64,7 +82,7 @@ class BestSplitter:
                 if (p_val - 0) < (.5 - self.min_balancedness_tol) * (self.n_data_val - 0):
                     # print("continued by tolerance(val) constraint")
                     continue
-                if (self.n_data_val - p_val) < (.5 - self.min_balancedness_tol) * (self.n_data_val - 0):
+                if (self.n_data_val - p_val) < (.5 - self.min_balancedness_tol) * (self.n_data_val - 0): # pylint: disable=C0301
                     # print("broke by tolerance(val) constraint")
                     break
 
@@ -85,7 +103,8 @@ class BestSplitter:
                 # skipped min_weight_leaf, min_eig_leaf conditions
 
                 y_data = self.data_train.sort_values(feature)[self.target].to_numpy()
-                proxy_delta_tilde = self.criterion.get_proxy_delta_tilde(y_left=y_data[:p], y_right=y_data[p:])
+                proxy_delta_tilde = self.criterion.get_proxy_delta_tilde(y_left=y_data[:p],
+                                                                         y_right=y_data[p:])
 
                 if proxy_delta_tilde > best_proxy_delta_tilde:
                     best_p = p
@@ -95,4 +114,3 @@ class BestSplitter:
                     best_split_point = split_point
 
         return best_feature, best_split_point, best_p, best_p_val
-    
