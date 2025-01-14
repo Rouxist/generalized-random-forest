@@ -4,7 +4,15 @@
 **/._.DS_Store
 
 __pycache__
+
+# cython stuffs
+*.c
+*.so
+build/
+
+# etc
 dgp_test.py
 /test
 /econmltest
 /result
+
