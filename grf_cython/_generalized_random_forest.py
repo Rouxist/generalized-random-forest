@@ -16,6 +16,7 @@ class GRF:
                  honest:bool=True, 
                  subforest_size:int=4, 
                  block_size:int=1, 
+                 model_spec:str="y=b+u",
                  random_state:int=None) -> None:
 
         # Hyperparameters
@@ -26,13 +27,14 @@ class GRF:
         self.honest = honest                              # honesty
         self.subforest_size = subforest_size
         self.block_size = block_size                      # block size to be used as a parameter of block sampling.
+        self.model_spec = model_spec                      # model specification
         self.random_state = RandomState(random_state)     # RandomState object
 
         # Attributes
         self.estimators_ = []                             # list of estimators (gradient trees)
         self.subsample_random_state_seed = 0
 
-    def fit(self, X, y) -> None:
+    def fit(self, X, y, T=None) -> None:
         # Subsample generation
         self.subsample_random_state_seed = self.random_state.randint(MAX_INT)
         subsample_random_state = np.random.RandomState(self.subsample_random_state_seed)
@@ -73,12 +75,18 @@ class GRF:
                                 min_samples_leaf=self.min_samples_leaf,
                                 max_depth=self.max_depth,
                                 honest=True,
+                                model_spec=self.model_spec,
                                 random_state=seed)
             trees.append(tree)
 
-        trees_fitted = Parallel(n_jobs=4, backend="threading")(
-            delayed(tree.fit)(X[slice], y[slice])
-            for slice, tree in zip(slice_indices, trees))
+        if self.model_spec=="y=b+u":
+            trees_fitted = Parallel(n_jobs=4, backend="threading")(
+                delayed(tree.fit)(X[slice], y[slice])
+                for slice, tree in zip(slice_indices, trees))
+        else:
+            trees_fitted = Parallel(n_jobs=4, backend="threading")(
+                delayed(tree.fit)(X[slice], y[slice], T[slice])
+                for slice, tree in zip(slice_indices, trees))
 
         self.estimators_.extend(trees_fitted)
 
@@ -106,9 +114,11 @@ class GRF:
 
         # Moment condition setup        
         def sum_moment_condition(theta, alpha) -> float: # Eq (2) of Athey, S., Tibshirani, J., & Wager, S. (2019). Generalized random forests.
-            # Depends on Regression equation
-            return np.sum(alpha.dot(aggr_val_y-theta))
-        
+            if self.model_spec=="y=b+u":
+                return np.sum(alpha.dot(aggr_val_y-theta))
+            elif self.model_spec=="y=a+bx+u":
+                return np.sum(alpha.dot(aggr_val_y-theta))
+                    
         # Initial value: median
         theta_0 = np.median(aggr_val_y)
         
@@ -137,7 +147,8 @@ class GRF:
         for dp_idx in range(n_given_datapoints):
             alpha = np.zeros((n_samples_val))
             leaf_indices = np.concatenate([tree.apply(np.expand_dims(X[dp_idx], axis=0)) for tree in self.estimators_])
-            
+            # leaf_indices = np.concatenate(Parallel(n_jobs=4, backend="threading")(delayed(tree.apply)(np.expand_dims(X[dp_idx], axis=0)) for tree in self.estimators_))
+
             for tree_idx in range(self.n_estimators):
                 leaf_idx = leaf_indices[tree_idx]
                 neighbors = (leaf_matrices[tree_idx][leaf_idx] > 0).squeeze()
