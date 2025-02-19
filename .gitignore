@@ -16,3 +16,7 @@ dgp_test.py
 /econmltest
 /result
 
+# test files
+cython_code_test.py
+grf_cython/_tester.pyx
+time_series_test.py
