@@ -1,4 +1,4 @@
-from ._criterion cimport GRFCriterion
+from ._criterion_qf cimport GRFCriterionQF
 
 from libc.stdlib cimport free
 from libc.string cimport memcpy
@@ -30,7 +30,7 @@ cdef inline void _init_split(SplitRecord* self, SIZE_t start_pos, SIZE_t start_p
     self.improvement = -INFINITY
 
 cdef class BestSplitter():
-    def __cinit__(self, GRFCriterion criterion, GRFCriterion criterion_val,
+    def __cinit__(self, GRFCriterionQF criterion, GRFCriterionQF criterion_val,
                   SIZE_t max_features, SIZE_t min_samples_leaf,
                   DTYPE_t min_balancedness_tol, bint honest, UINT32_t random_state):
         
@@ -254,11 +254,11 @@ cdef class BestSplitter():
                         printf("%.1f, ", self.y[samples[idx],0])
                     printf("]\n")
                     """
-                    
-                    self.criterion.update(current.pos)
-                    if self.honest:
-                        self.criterion_val.update(current.pos_val)
-                    current_proxy_improvement = self.criterion.get_proxy_delta_tilde()
+                    with gil: # can be removed after applying moment condition for calculating Delta (tilde)
+                        self.criterion.update(current.pos)
+                        if self.honest:
+                            self.criterion_val.update(current.pos_val)
+                    current_proxy_improvement = self.criterion.get_proxy_delta()
                     
                     """
                     with gil:
@@ -294,11 +294,13 @@ cdef class BestSplitter():
 
                         samples_val[p], samples_val[partition_end] = samples_val[partition_end], samples_val[p]
             self.criterion.reset()
-            self.criterion.update(best.pos)
+            with gil: # can be removed after applying moment condition for calculating Delta (tilde)
+                self.criterion.update(best.pos)
             
             if self.honest:
                 self.criterion_val.reset()
-                self.criterion_val.update(best.pos_val)
+                with gil: # can be removed after applying moment condition for calculating Delta (tilde)
+                    self.criterion_val.update(best.pos_val)
 
         split[0] = best
         return 0
