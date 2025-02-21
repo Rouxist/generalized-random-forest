@@ -9,7 +9,9 @@ from ._tree cimport UINT32_t         # Unsigned 32 bit integer
 cdef class GRFCriterionQF:
     cdef const DTYPE_t[:, :] X
     cdef const DOUBLE_t[:, ::1] y
-    cdef double* y_parent
+    cdef DOUBLE_t* y_parent
+    cdef DOUBLE_t* y_left
+    cdef DOUBLE_t* y_right
 
     cdef SIZE_t n_samples
     cdef double quantile
@@ -29,6 +31,6 @@ cdef class GRFCriterionQF:
     cdef int init(self, const DTYPE_t[:, :] X, const DOUBLE_t[:, ::1] y, SIZE_t* samples) nogil except -1
     cdef int node_reset(self, SIZE_t start, SIZE_t end)
     cdef int reset(self) nogil except -1
-    cdef int update(self, SIZE_t new_pos)
+    cdef int update(self, SIZE_t new_pos) nogil except -1
     cdef double get_proxy_delta(self) nogil
     cdef void node_value(self, double* dest) nogil
