@@ -63,6 +63,8 @@ cdef class GRFCriterionQF:
         self.end = end
 
         safe_realloc(&self.y_parent, self.n_samples)
+        safe_realloc(&self.y_left, self.n_samples)
+        safe_realloc(&self.y_right, self.n_samples)
     
         cdef DOUBLE_t* yf_parent = self.y_parent
         for i in range(start, end):
@@ -112,9 +114,6 @@ cdef class GRFCriterionQF:
         self.n_left = 0.0
         self.n_right = 0.0
 
-        safe_realloc(&self.y_left, self.n_samples)
-        safe_realloc(&self.y_right, self.n_samples)
-
 
         for i in range(start, new_pos):
             yf_left[i] = self.y[samples[i], 0]
@@ -122,7 +121,7 @@ cdef class GRFCriterionQF:
             
         sort(yf_left + start, new_pos - start)
 
-        theta_hat_left2 = _get_quantile(yf_left, new_pos - start, start, quantile)
+        theta_hat_left = _get_quantile(yf_left, new_pos - start, start, quantile)
 
         for i in range(new_pos, end):
             yf_right[i] = self.y[samples[i], 0]
@@ -130,7 +129,7 @@ cdef class GRFCriterionQF:
             
         sort(yf_right + new_pos, end - new_pos)
 
-        theta_hat_right2 = _get_quantile(yf_right, end - new_pos, new_pos, quantile)
+        theta_hat_right = _get_quantile(yf_right, end - new_pos, new_pos, quantile)
 
         """
         # print out calculated theta_hat of child nodes
