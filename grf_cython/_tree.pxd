@@ -57,6 +57,7 @@ cdef class DepthFirstTreeBuilder:
 
     # cpdef build(self, Tree tree, object X, np.ndarray y,
     cpdef build(self, Tree tree, np.ndarray[np.float64_t, ndim=2] X, np.ndarray y,
+                np.ndarray T,
                 np.ndarray samples_train,
                 np.ndarray samples_val,
                 np.ndarray sample_weight=*)

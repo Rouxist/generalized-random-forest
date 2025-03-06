@@ -1,4 +1,5 @@
 from ._criterion cimport GRFCriterion
+from ._criterion_cf cimport GRFCriterionCF
 
 from libc.stdlib cimport free
 from libc.string cimport memcpy
@@ -30,7 +31,7 @@ cdef inline void _init_split(SplitRecord* self, SIZE_t start_pos, SIZE_t start_p
     self.improvement = -INFINITY
 
 cdef class BestSplitter():
-    def __cinit__(self, GRFCriterion criterion, GRFCriterion criterion_val,
+    def __cinit__(self, GRFCriterionCF criterion, GRFCriterionCF criterion_val,
                   SIZE_t max_features, SIZE_t min_samples_leaf,
                   DTYPE_t min_balancedness_tol, bint honest, UINT32_t random_state):
         
@@ -74,6 +75,7 @@ cdef class BestSplitter():
         n_samples[0] = j
 
     cdef int init(self, const DTYPE_t[:, :] X, const DOUBLE_t[:, ::1] y,
+                  const DOUBLE_t[:, ::1] T,
                   DOUBLE_t* sample_weight,
                   const SIZE_t[::1] np_samples_train,
                   const SIZE_t[::1] np_samples_val) nogil except -1:
@@ -98,10 +100,12 @@ cdef class BestSplitter():
 
         self.X = X
         self.y = y
+        self.T = T
         self.sample_weight = sample_weight
 
         # Initialize criterion
         self.criterion.init(self.X, self.y, 
+                            self.T,
                             self.samples)
         
         # If `honest=True` do initialize analogous validation set objects
@@ -114,7 +118,7 @@ cdef class BestSplitter():
                             &self.n_samples_val, 
                             )
             safe_realloc(&self.feature_values_val, self.n_samples_val)
-            self.criterion_val.init(self.X, self.y, self.samples_val)
+            self.criterion_val.init(self.X, self.y, self.T, self.samples_val)
         else:
             self.n_samples_val = self.n_samples
             self.samples_val = self.samples
@@ -255,9 +259,10 @@ cdef class BestSplitter():
                     printf("]\n")
                     """
                     
-                    self.criterion.update(current.pos)
-                    if self.honest:
-                        self.criterion_val.update(current.pos_val)
+                    with gil:
+                        self.criterion.update(current.pos)
+                        if self.honest:
+                            self.criterion_val.update(current.pos_val)
                     current_proxy_improvement = self.criterion.get_proxy_delta_tilde()
                     
                     """
@@ -294,11 +299,13 @@ cdef class BestSplitter():
 
                         samples_val[p], samples_val[partition_end] = samples_val[partition_end], samples_val[p]
             self.criterion.reset()
-            self.criterion.update(best.pos)
+            with gil:
+                self.criterion.update(best.pos)
             
             if self.honest:
                 self.criterion_val.reset()
-                self.criterion_val.update(best.pos_val)
+                with gil:
+                    self.criterion_val.update(best.pos_val)
 
         split[0] = best
         return 0

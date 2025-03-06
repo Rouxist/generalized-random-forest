@@ -22,15 +22,18 @@ cdef class GRFCriterionCF:
     cdef SIZE_t start
     cdef SIZE_t pos
     cdef SIZE_t end
-    cdef double*theta_p_hat
+    cdef double* nu_p_hat
+    cdef double* theta_p_hat
+    cdef double T_bar
 
     cdef double* sum_left
     cdef double* sum_right
 
     cdef int init(self, const DTYPE_t[:, :] X, const DOUBLE_t[:, ::1] y, 
-                  const DOUBLE_t[:, ::1] T, SIZE_t* samples) nogil except -1
+                  const DOUBLE_t[:, ::1] T, 
+                  SIZE_t* samples) nogil except -1
     cdef int node_reset(self, SIZE_t start, SIZE_t end)
     cdef int reset(self) nogil except -1
-    cdef int update(self, SIZE_t new_pos) nogil except -1
+    cdef int update(self, SIZE_t new_pos)
     cdef double get_proxy_delta_tilde(self) nogil
     cdef void node_value(self, double* dest) nogil

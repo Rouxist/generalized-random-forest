@@ -61,6 +61,7 @@ cdef class DepthFirstTreeBuilder():
         self.min_impurity_decrease = min_impurity_decrease
 
     cpdef build(self, Tree tree, np.ndarray[np.float64_t, ndim=2] X, np.ndarray y,
+                np.ndarray T,
                 np.ndarray samples_train,
                 np.ndarray samples_val,
                 np.ndarray sample_weight=None):
@@ -81,7 +82,7 @@ cdef class DepthFirstTreeBuilder():
         cdef SIZE_t min_samples_leaf = self.min_samples_leaf
         cdef SIZE_t min_samples_split = self.min_samples_split
 
-        splitter.init(X, y, sample_weight_ptr, samples_train, samples_val)
+        splitter.init(X, y, T, sample_weight_ptr, samples_train, samples_val)
 
         cdef SIZE_t start
         cdef SIZE_t end

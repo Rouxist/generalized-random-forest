@@ -2,6 +2,7 @@ import numpy as np
 cimport numpy as np
 
 from ._criterion cimport GRFCriterion
+from ._criterion_cf cimport GRFCriterionCF
 
 from ._tree cimport DTYPE_t          # Type of X
 from ._tree cimport DOUBLE_t         # Type of y, sample_weight
@@ -26,8 +27,8 @@ cdef struct SplitRecord:
     double impurity_right_val  # Impurity of the right split on validation set.
 
 cdef class BestSplitter:
-    cdef public GRFCriterion criterion
-    cdef public GRFCriterion criterion_val
+    cdef public GRFCriterionCF criterion
+    cdef public GRFCriterionCF criterion_val
     cdef public SIZE_t max_features
     cdef public SIZE_t min_samples_leaf
     cdef public double min_balancedness_tol
@@ -51,6 +52,7 @@ cdef class BestSplitter:
 
     cdef const DTYPE_t[:, :] X
     cdef const DOUBLE_t[:, ::1] y
+    cdef const DOUBLE_t[:, ::1] T
     cdef DOUBLE_t* sample_weight
 
     cdef int init_sample_inds(self, SIZE_t* samples,
@@ -60,6 +62,7 @@ cdef class BestSplitter:
                               ) nogil except -1
 
     cdef int init(self, const DTYPE_t[:, :] X, const DOUBLE_t[:, ::1] y,
+                  const DOUBLE_t[:, ::1] T,
                   DOUBLE_t* sample_weight,
                   const SIZE_t[::1] np_samples_train,
                   const SIZE_t[::1] np_samples_val) nogil except -1

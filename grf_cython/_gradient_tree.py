@@ -4,7 +4,7 @@ from numpy.random import RandomState
 from ._tree import Tree, DepthFirstTreeBuilder
 from ._splitter import BestSplitter
 from ._criterion import GRFCriterion
-# from ._criterion_cf import GRFCriterionCF
+from ._criterion_cf import GRFCriterionCF
 
 class GradientTree():
     def __init__(self,
@@ -58,13 +58,12 @@ class GradientTree():
                                     random_state=self.random_state.randint(np.iinfo(np.int32).max))
             
         elif self.model_spec=="y=a+bx+u":
-            # No type check of T yet
-            print("T:", self.T_parent)
-            # criterion = GRFCriterion(n_samples=self.n_samples, 
-            #                         random_state=self.random_state.randint(np.iinfo(np.int32).max))
+            # No type check for T yet
+            criterion = GRFCriterionCF(n_samples=self.n_samples, 
+                                       random_state=self.random_state.randint(np.iinfo(np.int32).max))
             
-            # criterion_val = GRFCriterion(n_samples=self.n_samples, 
-            #                         random_state=self.random_state.randint(np.iinfo(np.int32).max))
+            criterion_val = GRFCriterionCF(n_samples=self.n_samples, 
+                                           random_state=self.random_state.randint(np.iinfo(np.int32).max))
         
         else:
             raise ValueError("GRF for other model specification is not implemented yet")
@@ -84,7 +83,7 @@ class GradientTree():
                                         self.max_depth,
                                         self.min_impurity_decrease,)
 
-        builder.build(self.tree_, X, y.reshape(-1, 1), self.indices_train, self.indices_val)
+        builder.build(self.tree_, X, y.reshape(-1, 1), T.reshape(-1, 1), self.indices_train, self.indices_val)
 
         return self
 

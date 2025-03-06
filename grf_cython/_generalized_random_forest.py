@@ -95,18 +95,24 @@ class GRF:
                             for i in range(self.n_estimators)]
         val_y_list = [self.estimators_[i].y_parent[self.estimators_[i].indices_val]
                             for i in range(self.n_estimators)]
+        val_T_list = [self.estimators_[i].T_parent[self.estimators_[i].indices_val]
+                            for i in range(self.n_estimators)]
         
         # Pool data from all trees
         pooled_val_X = np.concatenate(val_X_list)
         pooled_val_y = np.concatenate(val_y_list)
+        pooled_val_T = np.concatenate(val_T_list)
         if pooled_val_y.ndim == 1:
             pooled_val_y = np.expand_dims(pooled_val_y, (-1))
-        pooled_data = np.concatenate([pooled_val_y, pooled_val_X], axis=1)
+        if pooled_val_T.ndim == 1:
+            pooled_val_T = np.expand_dims(pooled_val_T, (-1))
+        pooled_data = np.concatenate([pooled_val_T, pooled_val_y, pooled_val_X], axis=1)
 
         # Drop duplicates
         aggr_val_data = np.unique(pooled_data, axis=0)
-        aggr_val_X = aggr_val_data[:,1:].copy()
-        aggr_val_y = aggr_val_data[:,0].copy()
+        aggr_val_X = aggr_val_data[:,2:].copy()
+        aggr_val_y = aggr_val_data[:,1].copy()
+        aggr_val_T = aggr_val_data[:,0].copy()
         n_samples_val = aggr_val_X.shape[0]
 
         # Pre-calculate indices of {val datapoints in each tree} in the aggregated dataset
@@ -114,13 +120,17 @@ class GRF:
 
         # Moment condition setup        
         def sum_moment_condition(theta, alpha) -> float: # Eq (2) of Athey, S., Tibshirani, J., & Wager, S. (2019). Generalized random forests.
-            if self.model_spec=="y=b+u":
-                return np.sum(alpha.dot(aggr_val_y-theta))
-            elif self.model_spec=="y=a+bx+u":
-                return np.sum(alpha.dot(aggr_val_y-theta))
-                    
-        # Initial value: median
-        theta_0 = np.median(aggr_val_y)
+            return np.sum(alpha.dot(aggr_val_y-theta))
+        
+        def sum_moment_conditions(params, y, T, alpha) -> float:
+            # Moment condition for regression equation y_i = \nu + \theta T_i + u_i
+            theta = params[0]
+            nu = params[1]
+
+            moment1 = np.sum(alpha.dot(T * (y - nu - theta * T)))
+            moment2 = np.sum(alpha.dot(y - nu - theta * T))
+
+            return np.array([moment1, moment2])
         
         # Output initialization
         n_given_datapoints = X.shape[0]
@@ -157,7 +167,11 @@ class GRF:
                     if neighbor:
                         alpha[indices_from_whole[tree_idx][i]] += 1/sum(neighbors)/self.n_estimators
             
-            res = fsolve(sum_moment_condition, theta_0, alpha)
-            predictions[dp_idx] = res[0]
+            # Initial guess
+            theta_0 = np.array([0.0, np.mean(aggr_val_y)])
+            
+            # Solve the equation using fsolve
+            result = fsolve(sum_moment_conditions, theta_0, args=(aggr_val_y, aggr_val_T, alpha))
+            predictions[dp_idx] = result[0]
 
         return predictions
