@@ -1,3 +1,4 @@
+import math
 import numpy as np
 from numpy.random import RandomState
 from scipy.optimize import fsolve
@@ -15,7 +16,8 @@ class GRF:
                  max_features:int=None, 
                  honest:bool=True, 
                  subforest_size:int=4, 
-                 block_size:int=1, 
+                 block_size:int=1,
+                 quantile:float=0.5,
                  random_state:int=None) -> None:
 
         # Hyperparameters
@@ -26,6 +28,7 @@ class GRF:
         self.honest = honest                              # honesty
         self.subforest_size = subforest_size
         self.block_size = block_size                      # block size to be used as a parameter of block sampling.
+        self.quantile = quantile                          # quantile for quantile regression
         self.random_state = RandomState(random_state)     # RandomState object
 
         # Attributes
@@ -99,54 +102,45 @@ class GRF:
         aggr_val_data = np.unique(pooled_data, axis=0)
         aggr_val_X = aggr_val_data[:,1:].copy()
         aggr_val_y = aggr_val_data[:,0].copy()
+        aggr_val_y = aggr_val_y.tolist()
         n_samples_val = aggr_val_X.shape[0]
 
         # Pre-calculate indices of {val datapoints in each tree} in the aggregated dataset
-        indices_from_whole = [[np.where((aggr_val_X == dp).all(axis=1))[0].squeeze() for dp in val_X_list[tree_idx]] for tree_idx in range(self.n_estimators)]
+        indices_from_whole = [[np.where((aggr_val_X == dp).all(axis=1))[0].squeeze() for dp in val_X_list[tree_idx]] 
+                              for tree_idx in range(self.n_estimators)]
 
-        # Moment condition setup        
-        def sum_moment_condition(theta, alpha) -> float: # Eq (2) of Athey, S., Tibshirani, J., & Wager, S. (2019). Generalized random forests.
-            # Depends on Regression equation
-            return np.sum(alpha.dot(aggr_val_y-theta))
-        
-        # Initial value: median
-        theta_0 = np.median(aggr_val_y)
-        
         # Output initialization
         n_given_datapoints = X.shape[0]
         predictions = np.zeros(n_given_datapoints)
 
-        """
-        Comment: leaf_matrix
-        
-        One gradient tree has one leaf_matrix with size of (node_count, n_samples_val).
-        It represents which datapoints in validation set fall to certain leaf node.
-        It helps to find neighbor datapoints easily.
-        
-        Rows of non-leaf node is full of zero.
-
-        Example: leaf_matrix of a gradient tree with 3 nodes, given validation set with 23 datapoints:
-        [[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]      << root node
-        [0 1 0 1 1 0 1 0 1 1 1 1 1 1 1 1 0 1 1 1 1 1 1]       << leaf node
-        [1 0 1 0 0 1 0 1 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0]]      << leaf node
-        """
         leaf_matrices = [self.estimators_[tree_idx].get_weight(val_X_list[tree_idx]) 
                           for tree_idx in range(self.n_estimators)]
+
         
         # Main prediction procedure
         for dp_idx in range(n_given_datapoints):
-            alpha = np.zeros((n_samples_val))
-            leaf_indices = np.concatenate([tree.apply(np.expand_dims(X[dp_idx], axis=0)) for tree in self.estimators_])
-            
-            for tree_idx in range(self.n_estimators):
-                leaf_idx = leaf_indices[tree_idx]
-                neighbors = (leaf_matrices[tree_idx][leaf_idx] > 0).squeeze()
+            # index of leaf node from each tree, given a single datapoint
+            leaf_node_idx_list = [self.estimators_[tree_idx].apply(np.expand_dims(X[dp_idx], axis=0))
+                            for tree_idx in range(self.n_estimators)]
 
-                for i, neighbor in enumerate(neighbors):
-                    if neighbor:
-                        alpha[indices_from_whole[tree_idx][i]] += 1/sum(neighbors)/self.n_estimators
+            # element of this list is a list of index of y values of datapoints which are in leaf node of each tree
+            leaf_y_idx_list = [[x.item() for x, y in zip(indices_from_whole[tree_idx], leaf_matrices[tree_idx][leaf_node_idx_list[tree_idx].item()]) if y == 1] 
+                               for tree_idx in range(self.n_estimators)]
             
-            res = fsolve(sum_moment_condition, theta_0, alpha)
-            predictions[dp_idx] = res[0]
+            # element of this list is a list of y values of datapoints which are in leaf node of each tree
+            leaf_y_list = [[aggr_val_y[idx] for idx in leaf_y_idx_list[tree_idx]] for tree_idx in range(self.n_estimators)]
+
+            # element of this list is y values in leaf nodes, including all duplicates
+            pooled_leaf_y = sorted([x for sublist in leaf_y_list for x in sublist]) # flattening
+
+            # Quantile calculate
+            n = len(pooled_leaf_y)
+            q_idx = self.quantile * (n - 1)
+            low = math.floor(q_idx)
+            high = low + 1 if low + 1 < n else low
+            weight = q_idx - low
+            res = pooled_leaf_y[low] * (1 - weight) + pooled_leaf_y[high] * weight
+
+            predictions[dp_idx] = res
 
         return predictions
