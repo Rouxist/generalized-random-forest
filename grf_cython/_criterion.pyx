@@ -128,7 +128,7 @@ cdef class GRFCriterion:
         
         cdef SIZE_t* samples = self.samples
 
-        cdef double psi = 1.0
+        cdef double xi = 1.0
         cdef double inv_a_p = -1.0
         cdef double sum_rho_left = 0
         cdef double sum_rho_right = 0
@@ -139,14 +139,14 @@ cdef class GRFCriterion:
         # \sum{\rho} of left child node
         for p in range(start, new_pos):
             i = samples[p]
-            sum_rho_left += -1 * psi * inv_a_p * (self.y[i,0]-theta_p_hat[0])
+            sum_rho_left += -1 * xi * inv_a_p * (self.y[i,0]-theta_p_hat[0])
             self.n_left += 1.0
         self.sum_left[0] = sum_rho_left
 
         # \sum{\rho} of right child node
         for p in range(new_pos, end):
             i = samples[p]
-            sum_rho_right += -1 * psi * inv_a_p * (self.y[i,0]-theta_p_hat[0])
+            sum_rho_right += -1 * xi * inv_a_p * (self.y[i,0]-theta_p_hat[0])
             self.n_right += 1.0
         self.sum_right[0] = sum_rho_right
 
