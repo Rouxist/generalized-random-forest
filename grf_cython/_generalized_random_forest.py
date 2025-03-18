@@ -15,7 +15,9 @@ class GRF:
                  max_features:int=None, 
                  honest:bool=True, 
                  subforest_size:int=4, 
-                 block_size:int=1, 
+                 block_size:int=1,
+                 quantile:float=0.5,
+                 h:float=0.1,
                  random_state:int=None) -> None:
 
         # Hyperparameters
@@ -26,6 +28,8 @@ class GRF:
         self.honest = honest                              # honesty
         self.subforest_size = subforest_size
         self.block_size = block_size                      # block size to be used as a parameter of block sampling.
+        self.quantile = quantile                          # quantile for quantile regression
+        self.h = h
         self.random_state = RandomState(random_state)     # RandomState object
 
         # Attributes
@@ -72,6 +76,8 @@ class GRF:
             tree = GradientTree(max_features=self.max_features, 
                                 min_samples_leaf=self.min_samples_leaf,
                                 max_depth=self.max_depth,
+                                quantile=self.quantile,
+                                h=self.h,
                                 honest=True,
                                 random_state=seed)
             trees.append(tree)
@@ -104,11 +110,16 @@ class GRF:
         # Pre-calculate indices of {val datapoints in each tree} in the aggregated dataset
         indices_from_whole = [[np.where((aggr_val_X == dp).all(axis=1))[0].squeeze() for dp in val_X_list[tree_idx]] for tree_idx in range(self.n_estimators)]
 
-        # Moment condition setup        
-        def sum_moment_condition(theta, alpha) -> float: # Eq (2) of Athey, S., Tibshirani, J., & Wager, S. (2019). Generalized random forests.
-            # Depends on Regression equation
-            return np.sum(alpha.dot(aggr_val_y-theta))
+        # Moment condition setup
+        def _large_g(v, h):
+            v = np.asarray(v)
+            polynomial = 0.5 + (105/64) * (v - (5/3) * (v**3) + (7/5) * (v**5) - (3/7) * (v**7))
+            return np.where(v < -1*h, 0, np.where(v > h, 1, polynomial))
         
+        def sum_moment_condition(theta, alpha, tau, h) -> float: # Eq (2) of Athey, S., Tibshirani, J., & Wager, S. (2019). Generalized random forests.
+            # Depends on Regression equation
+            return np.sum(alpha.dot((tau - _large_g((theta-aggr_val_y)/h, h))))
+            
         # Initial value: median
         theta_0 = np.median(aggr_val_y)
         
@@ -146,7 +157,7 @@ class GRF:
                     if neighbor:
                         alpha[indices_from_whole[tree_idx][i]] += 1/sum(neighbors)/self.n_estimators
             
-            res = fsolve(sum_moment_condition, theta_0, alpha)
+            res = fsolve(sum_moment_condition, theta_0, args=(alpha, self.quantile, self.h))
             predictions[dp_idx] = res[0]
 
         return predictions

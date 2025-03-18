@@ -3,7 +3,7 @@ from numpy.random import RandomState
 
 from ._tree import Tree, DepthFirstTreeBuilder
 from ._splitter import BestSplitter
-from ._criterion import GRFCriterion
+from ._criterion_see_qf import GRFCriterionSEEQF
 
 class GradientTree():
     def __init__(self,
@@ -14,12 +14,16 @@ class GradientTree():
                  random_state=None,
                  min_impurity_decrease=0.,
                  min_balancedness_tol=0.45,
+                 quantile=0.5,
+                 h=0.1,
                  honest=True):
         self.min_samples_split = min_samples_split
         self.min_samples_leaf = min_samples_leaf
         self.max_depth = max_depth
         self.min_impurity_decrease = min_impurity_decrease
         self.min_balancedness_tol = min_balancedness_tol
+        self.quantile = quantile
+        self.h= h
         self.honest = honest
 
         if not max_features:
@@ -46,11 +50,15 @@ class GradientTree():
 
         self.tree_ = Tree(n_features=self.n_features)
 
-        criterion = GRFCriterion(n_samples=self.n_samples, 
-                                random_state=self.random_state.randint(np.iinfo(np.int32).max))
+        criterion = GRFCriterionSEEQF(n_samples=self.n_samples, 
+                                      quantile=self.quantile,
+                                      h=self.h,
+                                      random_state=self.random_state.randint(np.iinfo(np.int32).max))
         
-        criterion_val = GRFCriterion(n_samples=self.n_samples, 
-                                random_state=self.random_state.randint(np.iinfo(np.int32).max))
+        criterion_val = GRFCriterionSEEQF(n_samples=self.n_samples, 
+                                      quantile=self.quantile,
+                                      h=self.h,
+                                      random_state=self.random_state.randint(np.iinfo(np.int32).max))
 
         splitter = BestSplitter(criterion=criterion,
                                 criterion_val=criterion_val,

@@ -1,7 +1,7 @@
 import numpy as np
 cimport numpy as np
 
-from ._criterion cimport GRFCriterion
+from ._criterion_see_qf cimport GRFCriterionSEEQF
 
 from ._tree cimport DTYPE_t          # Type of X
 from ._tree cimport DOUBLE_t         # Type of y, sample_weight
@@ -26,8 +26,8 @@ cdef struct SplitRecord:
     double impurity_right_val  # Impurity of the right split on validation set.
 
 cdef class BestSplitter:
-    cdef public GRFCriterion criterion
-    cdef public GRFCriterion criterion_val
+    cdef public GRFCriterionSEEQF criterion
+    cdef public GRFCriterionSEEQF criterion_val
     cdef public SIZE_t max_features
     cdef public SIZE_t min_samples_leaf
     cdef public double min_balancedness_tol

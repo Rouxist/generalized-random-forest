@@ -15,12 +15,25 @@ from scipy.optimize import fsolve
 
 from ._utils cimport safe_realloc
 
-def mean_moment_condition(theta, y):
-    return np.mean(y - theta)
 
-cdef class GRFCriterion:
-    def __cinit__(self, SIZE_t n_samples, UINT32_t random_state):
+def _large_g(v, h):
+    v = np.asarray(v)
+    polynomial = 0.5 + (105/64) * (v - (5/3) * (v**3) + (7/5) * (v**5) - (3/7) * (v**7))
+    return np.where(v < -1*h, 0, np.where(v > h, 1, polynomial))
+
+def _large_g_prime(v, h):
+    v = np.asarray(v)
+    polynomial = (105/64) * (1 - 5 * (v**2) + 7 * (v**4) - 3 * (v**6))
+    return np.where(v < -1*h, 0, np.where(v > h, 0, polynomial))
+
+def mean_moment_condition(theta, y, tau, h):
+    return np.mean(tau - _large_g((theta-y)/h, h))
+
+cdef class GRFCriterionSEEQF:
+    def __cinit__(self, SIZE_t n_samples, double quantile, double h, UINT32_t random_state):
         self.n_samples = n_samples
+        self.quantile = quantile
+        self.h = h
         self.random_state = random_state
 
         self.theta_p_hat = NULL
@@ -51,6 +64,8 @@ cdef class GRFCriterion:
         
         cdef SIZE_t* samples = self.samples
         cdef double* theta_p_hat = self.theta_p_hat
+        cdef DOUBLE_t tau = self.quantile
+        cdef DOUBLE_t h = self.h
         self.start = start
         self.end = end
         self.n_node_samples = end - start
@@ -65,9 +80,22 @@ cdef class GRFCriterion:
         theta_0 = np.median(y_parent_new_ndarray)
         
         # Solve the equation using fsolve
-        moment_condition = partial(mean_moment_condition, y=y_parent_new_ndarray)
+        moment_condition = partial(mean_moment_condition, y=y_parent_new_ndarray, tau=tau, h=h)
         result = fsolve(moment_condition, theta_0)
         theta_p_hat[0] = result[0]
+        """
+        if self.random_state==1611903777:
+            print("theta_p_hat[0]:", theta_p_hat[0])
+            print("y_p vector:", y_parent_new_ndarray)
+            print("theta_p_hat[0]-y_p:", theta_p_hat[0]-y_parent_new_ndarray)
+            print("theta_p_hat[0]-y_p:", theta_p_hat[0]-y_parent_new_ndarray)
+            print("(theta_p_hat[0]-y_p)/h:", (theta_p_hat[0]-y_parent_new_ndarray)/h)
+            print("A_p vector:", _large_g_prime((theta_p_hat[0]-y_parent_new_ndarray)/h, h) * (1/h))
+        """
+        # print("A_p vector:", _large_g_prime((theta_p_hat[0]-y_parent_new_ndarray)/h, h) * (1/h))
+
+
+        self.A_p = -1 * (np.mean(_large_g_prime((theta_p_hat[0]-y_parent_new_ndarray)/h, h) * (1/h)) + 1e-6) # prevent division by zero
 
         # Reset to pos=start
         self.reset()
@@ -105,7 +133,7 @@ cdef class GRFCriterion:
             return inv(a_p)
     """
 
-    cdef int update(self, SIZE_t new_pos) nogil except -1:
+    cdef int update(self, SIZE_t new_pos):
         """
         Calculates sum_{C} rho_i.
 
@@ -129,9 +157,12 @@ cdef class GRFCriterion:
         cdef SIZE_t* samples = self.samples
 
         cdef double xi = 1.0
-        cdef double inv_a_p = -1.0
+        cdef double inv_a_p = 1 / (self.A_p)
         cdef double sum_rho_left = 0
         cdef double sum_rho_right = 0
+
+        cdef double tau = self.quantile
+        cdef double h = self.h
 
         self.n_left = 0.0
         self.n_right = 0.0
@@ -139,14 +170,14 @@ cdef class GRFCriterion:
         # \sum{\rho} of left child node
         for p in range(start, new_pos):
             i = samples[p]
-            sum_rho_left += -1 * xi * inv_a_p * (self.y[i,0]-theta_p_hat[0])
+            sum_rho_left += -1 * xi * inv_a_p * (tau - _large_g((theta_p_hat[0] - self.y[i,0]) / h, h))
             self.n_left += 1.0
         self.sum_left[0] = sum_rho_left
 
         # \sum{\rho} of right child node
         for p in range(new_pos, end):
             i = samples[p]
-            sum_rho_right += -1 * xi * inv_a_p * (self.y[i,0]-theta_p_hat[0])
+            sum_rho_right += -1 * xi * inv_a_p * (tau - _large_g((theta_p_hat[0] - self.y[i,0]) / h, h))
             self.n_right += 1.0
         self.sum_right[0] = sum_rho_right
 
