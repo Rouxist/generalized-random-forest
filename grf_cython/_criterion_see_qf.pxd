@@ -33,6 +33,6 @@ cdef class GRFCriterionSEEQF:
                   SIZE_t* samples) nogil except -1
     cdef int node_reset(self, SIZE_t start, SIZE_t end)
     cdef int reset(self) nogil except -1
-    cdef int update(self, SIZE_t new_pos)
+    cdef int update(self, SIZE_t new_pos) nogil except -1
     cdef double get_proxy_delta_tilde(self) nogil
     cdef void node_value(self, double* dest) nogil
