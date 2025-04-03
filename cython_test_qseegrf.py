@@ -98,51 +98,51 @@ plt.scatter(X[:,0], pred_1, c='black', s=10, alpha=0.5)
 
 ## Model 2 ############################################################################################################
 
-# model = GRF(n_estimators=N_ESTIMATORS,
-#             max_depth=MAX_DEPTH,
-#             max_features=math.floor(N_FEATURES * 0.5),
-#             min_samples_leaf=5,
-#             honest=HONEST,
-#             quantile=0.1,
-#             h=H,
-#             random_state=42)
+model = GRF(n_estimators=N_ESTIMATORS,
+            max_depth=MAX_DEPTH,
+            max_features=math.floor(N_FEATURES * 0.5),
+            min_samples_leaf=5,
+            honest=HONEST,
+            quantile=0.1,
+            h=H,
+            random_state=42)
 
 
-# print("\n================ Scratch model ================")
-# start_time = time.time()
-# model.fit(X, y)
-# print(f"Model from scratch(fit): {time.time() - start_time:.5f} sec")
+print("\n================ Scratch model ================")
+start_time = time.time()
+model.fit(X, y)
+print(f"Model from scratch(fit): {time.time() - start_time:.5f} sec")
 
-# start_time = time.time()
-# pred_5 = model.predict(X)
-# print(f"Model from scratch(predict): {time.time() - start_time:.5f} sec")
+start_time = time.time()
+pred_5 = model.predict(X)
+print(f"Model from scratch(predict): {time.time() - start_time:.5f} sec")
 
-# plt.scatter(X[:,0], pred_5, c='black', s=10, alpha=0.5)
+plt.scatter(X[:,0], pred_5, c='black', s=10, alpha=0.5)
 
 #####################################################################################################################
 
 ## Model 3 ############################################################################################################
 
-# model = GRF(n_estimators=N_ESTIMATORS,
-#             max_depth=MAX_DEPTH,
-#             max_features=math.floor(N_FEATURES * 0.5),
-#             min_samples_leaf=5,
-#             honest=HONEST,
-#             quantile=0.9,
-#             h=H,
-#             random_state=42)
+model = GRF(n_estimators=N_ESTIMATORS,
+            max_depth=MAX_DEPTH,
+            max_features=math.floor(N_FEATURES * 0.5),
+            min_samples_leaf=5,
+            honest=HONEST,
+            quantile=0.9,
+            h=H,
+            random_state=42)
 
 
-# print("\n================ Scratch model ================")
-# start_time = time.time()
-# model.fit(X, y)
-# print(f"Model from scratch(fit): {time.time() - start_time:.5f} sec")
+print("\n================ Scratch model ================")
+start_time = time.time()
+model.fit(X, y)
+print(f"Model from scratch(fit): {time.time() - start_time:.5f} sec")
 
-# start_time = time.time()
-# pred_9 = model.predict(X)
-# print(f"Model from scratch(predict): {time.time() - start_time:.5f} sec")
+start_time = time.time()
+pred_9 = model.predict(X)
+print(f"Model from scratch(predict): {time.time() - start_time:.5f} sec")
 
-# plt.scatter(X[:,0], pred_9, c='black', s=10, alpha=0.5)
+plt.scatter(X[:,0], pred_9, c='black', s=10, alpha=0.5)
 
 #####################################################################################################################
 # df = pd.DataFrame({'pred_0.1':pred_1, 'pred_0.5':pred_5, 'pred_0.9':pred_9, 'y': y, 'X_0': X[:,0], 'u': u})
@@ -163,6 +163,10 @@ plt.step([-1, 0, 1], [1.28, 2.08, 2.08], where='post', label='truth') # Create s
 # plt.step([-1, 0, 1], [0, 0, 0], where='post', label='truth') # Create step plot
 # plt.step([-1, 0, 1], [-1.28, -3.84, -3.84], where='post', label='truth') # Create step plot
 # plt.step([-1, 0, 1], [1.28, 3.84, 3.84], where='post', label='truth') # Create step plot
+
+df_result = pd.DataFrame({'Predicted(0.1)': pred_1, 'Predicted(0.5)': pred_5, 'Predicted(0.9)': pred_9})
+print()
+print(df_result)
 
 plt.tight_layout()
 plt.savefig(f"../results_qseegrf/N_{N}__trees_{N_ESTIMATORS}__features_{N_FEATURES}__seed_{MAIN_SEED}__std_max2__md5__nf50__mean_shift__newpred.png")

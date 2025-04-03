@@ -37,6 +37,8 @@ class GRF:
         self.subsample_random_state_seed = 0
 
     def fit(self, X, y) -> None:
+        self.X = X.copy()
+        self.y = y.copy()
         # Subsample generation
         self.subsample_random_state_seed = self.random_state.randint(MAX_INT)
         subsample_random_state = np.random.RandomState(self.subsample_random_state_seed)
@@ -95,20 +97,16 @@ class GRF:
                             for i in range(self.n_estimators)]
         
         # Pool data from all trees
-        pooled_val_X = np.concatenate(val_X_list)
         pooled_val_y = np.concatenate(val_y_list)
-        if pooled_val_y.ndim == 1:
-            pooled_val_y = np.expand_dims(pooled_val_y, (-1))
-        pooled_data = np.concatenate([pooled_val_y, pooled_val_X], axis=1)
+        if self.y.ndim == 1:
+            self.y = np.expand_dims(self.y, (-1))
 
-        # Drop duplicates
-        aggr_val_data = np.unique(pooled_data, axis=0)
-        aggr_val_X = aggr_val_data[:,1:].copy()
-        aggr_val_y = aggr_val_data[:,0].copy()
-        n_samples_val = aggr_val_X.shape[0]
+        n_samples_val = self.X.shape[0]
+        X_all = self.X
+        y_all = self.y
 
         # Pre-calculate indices of {val datapoints in each tree} in the aggregated dataset
-        indices_from_whole = [[np.where((aggr_val_X == dp).all(axis=1))[0].squeeze() for dp in val_X_list[tree_idx]] for tree_idx in range(self.n_estimators)]
+        indices_from_whole = [[np.where((X_all == dp).all(axis=1))[0].squeeze() for dp in val_X_list[tree_idx]] for tree_idx in range(self.n_estimators)]
 
         # Moment condition setup
         def _large_g(v, h):
@@ -118,10 +116,10 @@ class GRF:
         
         def sum_moment_condition(theta, alpha, tau, h) -> float: # Eq (2) of Athey, S., Tibshirani, J., & Wager, S. (2019). Generalized random forests.
             # Depends on Regression equation
-            return np.sum(alpha.dot((tau - _large_g((theta-aggr_val_y)/h, h))))
+            return np.sum(alpha.dot((tau - _large_g((theta-y_all)/h, h))))
             
         # Initial value: median
-        theta_0 = np.median(aggr_val_y)
+        theta_0 = np.median(pooled_val_y)
         
         # Output initialization
         n_given_datapoints = X.shape[0]
@@ -151,11 +149,11 @@ class GRF:
             
             for tree_idx in range(self.n_estimators):
                 leaf_idx = leaf_indices[tree_idx]
-                neighbors = (leaf_matrices[tree_idx][leaf_idx] > 0).squeeze()
+                neighbors = (leaf_matrices[tree_idx][leaf_idx] > 0).squeeze() # Same as `neighbors = leaf_matrices[tree_idx][leaf_idx]`. But this boolean expression executes faster.
 
                 for i, neighbor in enumerate(neighbors):
                     if neighbor:
-                        alpha[indices_from_whole[tree_idx][i]] += 1/sum(neighbors)/self.n_estimators
+                        alpha[indices_from_whole[tree_idx][i]] += 1/sum(neighbors)/self.n_estimators # If neighbor, weight increases. Otherwise, it adds 0.
             
             res = fsolve(sum_moment_condition, theta_0, args=(alpha, self.quantile, self.h))
             predictions[dp_idx] = res[0]
