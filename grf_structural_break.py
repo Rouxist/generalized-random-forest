@@ -18,8 +18,8 @@ def main():
     parser.add_argument('--shift_type', default='mean', help='mean/scale')
     parser.add_argument('--n_obs', type=int, default=1000, help='# of observations')
     parser.add_argument('--n_feats', type=int, default=40, help='# of features')
-    parser.add_argument('--mu', type=float, default=0., help='True \mu')
-    parser.add_argument('--beta_1', type=float, default=0.8, help='True \beta_1')
+    parser.add_argument('--mu', type=float, default=0., help='True mu')
+    parser.add_argument('--beta_1', type=float, default=0.8, help='True beta_1')
 
     ## Model setup
     parser.add_argument('--n_estimators', type=int, default=400)
