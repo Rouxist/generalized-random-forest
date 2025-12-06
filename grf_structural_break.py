@@ -121,7 +121,7 @@ def main():
     print(df_result)
 
     plt.tight_layout()
-    plt.savefig(f"../results_qseegrf/N_{N}__trees_{N_ESTIMATORS}__maxfeats_{PORTION_FEATURES}__seed_{MAIN_SEED}__shifttype_{shift_type}.png")
+    plt.savefig(f"../results_qseegrf/N_{N}__trees_{N_ESTIMATORS}__maxfeats_{PORTION_FEATURES}__seed_{MAIN_SEED}__shifttype_{shift_type}__h_{int(H * 100):03d}.png")
 
 
 if __name__ == '__main__':
