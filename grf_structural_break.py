@@ -62,7 +62,7 @@ def main():
     ## Simplified test data
     x1 = np.linspace(-1, 1, 200)
     x1 = np.expand_dims(x1, axis=1)
-    x_rem = np.zeros((200,39))
+    x_rem = np.zeros((200,N_FEATURES-1))
     X_test = np.hstack((x1, x_rem))
 
     # Main simulation part
@@ -121,7 +121,7 @@ def main():
     print(df_result)
 
     plt.tight_layout()
-    plt.savefig(f"../results_qseegrf/N_{N}__trees_{N_ESTIMATORS}__maxfeats_{PORTION_FEATURES}__seed_{MAIN_SEED}__shifttype_{shift_type}__h_{int(H * 100):03d}.png")
+    plt.savefig(f"../results_qseegrf/N_{N}__trees_{N_ESTIMATORS}__maxfeats_{int(PORTION_FEATURES * 100):03d}__seed_{MAIN_SEED}__shifttype_{shift_type}__h_{int(H * 100):03d}.png")
 
 
 if __name__ == '__main__':
